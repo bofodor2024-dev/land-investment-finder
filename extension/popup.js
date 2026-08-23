@@ -38,45 +38,27 @@ function extractListingData() {
     if (m) priceRaw = m[1];
   }
 
-  // Location: sahibinden's breadcrumb is always
-  // "Anasayfa > Emlak > Arsa > Satılık > <province> > <district> > <neighborhood>".
-  // Rather than matching province/district names against a hardcoded city
-  // list (which just means missing whatever city we didn't think to list —
-  // e.g. Çanakkale isn't "Aegean" by strict geography but plenty of olive
-  // land is there), anchor on the taxonomy words instead.
-  //
-  // Just matching "a run of 2+ category-ish words" isn't enough on its own
-  // though — sahibinden also has a site-wide category mega-menu (Emlak,
-  // Vasıta, Yedek Parça, İkinci El ve Sıfır Alışveriş, ...) elsewhere on
-  // the page, and that menu's run of words is *longer* than the real
-  // 4-word breadcrumb, so a "pick the longest run" rule grabs the wrong
-  // one. "Anasayfa" (Home) only appears as the very first breadcrumb
-  // crumb, never inside that category menu, so anchor the run there
-  // specifically instead of picking whichever run is longest.
-  const BREADCRUMB_MARKERS = new Set([
-    "Emlak", "Arsa", "Satılık", "Kiralık", "Tarla", "Konut",
-    "İşyeri", "Bağ", "Bahçe", "Devremülk", "Turistik Tesis",
-  ]);
+  // Location: turns out sahibinden's visible "Anasayfa > Emlak > Arsa >
+  // Satılık > province > district > neighborhood" breadcrumb bar is actually
+  // TWO unrelated DOM elements rendered adjacently — a static site nav
+  // prefix, and a separate 3-link location trail. The location trail sits
+  // immediately before the "İlan ile İlgili Şikayetim Var" (report listing)
+  // link, which is a standard element present on every listing page, so
+  // anchor there instead of on category words (which also appear in a
+  // site-wide mega-menu and in hidden location-search filter dropdowns —
+  // both of which produced wrong matches in earlier versions of this).
   const linkText = (a) => (a?.innerText || "").trim();
   const links = Array.from(document.querySelectorAll("a"));
 
-  let bestRunEnd = -1, bestRunLen = 0;
-  for (let i = 0; i < links.length; i++) {
-    if (linkText(links[i]) !== "Anasayfa") continue;
-    let j = i + 1;
-    while (j < links.length && BREADCRUMB_MARKERS.has(linkText(links[j]))) j++;
-    const runLen = j - i; // includes the "Anasayfa" link itself
-    if (runLen > bestRunLen) { bestRunLen = runLen; bestRunEnd = j; }
-  }
-
-  // Require at least "Anasayfa" + 2 category words (e.g. Emlak, Arsa)
-  // before the location chain starts, so a bare/interrupted "Anasayfa"
-  // link elsewhere (e.g. the site logo) doesn't false-positive.
+  const reportLinkIndex = links.findIndex((a) => linkText(a).includes("İlgili Şikayetim"));
   let province = null, district = null, neighborhood = null;
-  if (bestRunLen >= 3) {
-    province = linkText(links[bestRunEnd]) || null;
-    district = linkText(links[bestRunEnd + 1]) || null;
-    neighborhood = linkText(links[bestRunEnd + 2]) || null;
+  if (reportLinkIndex >= 3) {
+    const [p, d, n] = [links[reportLinkIndex - 3], links[reportLinkIndex - 2], links[reportLinkIndex - 1]].map(linkText);
+    if (p && d && n) {
+      province = p;
+      district = d;
+      neighborhood = n;
+    }
   }
 
   return {
