@@ -17,6 +17,7 @@ from config import (
     LIEN_KEYWORDS,
     ORCHARD_TREE_KEYWORDS,
     ROAD_ACCESS_KEYWORDS,
+    STRONG_ORCHARD_KEYWORDS,
     TAPU_CLEAN_KEYWORDS,
     TAPU_NONE_KEYWORDS,
     TAPU_SHARED_KEYWORDS,
@@ -27,8 +28,42 @@ from config import (
 _PRICE_TL_RE = re.compile(r"(\d{1,3}(?:\.\d{3})+)\s*TL(?!\s*/)")
 
 
+def _turkish_lower(s: str) -> str:
+    """Python's default str.lower() isn't Turkish-aware: 'İ' becomes 'i' plus
+    an invisible combining-dot mark (two characters), not plain 'i'. Since
+    many listing titles are in ALL CAPS ("ZEYTİNLİK"), this silently broke
+    every keyword containing 'i' when matched against such text. Map the
+    Turkish-specific letters explicitly before falling back to str.lower()
+    for everything else (ç/ğ/ş/ö/ü already lowercase correctly by default).
+    """
+    return s.replace("İ", "i").replace("I", "ı").lower()
+
+
+# Turkish attaches the formal copula suffix directly onto "var"/"mevcut"
+# ("var" + "dır" = "vardır", "mevcut" + "tur" = "mevcuttur" — same meaning,
+# more formal register, extremely common in listing text). A strict \b
+# immediately after these words would miss that continuation entirely.
+_COPULA_SUFFIXES = {"var": ("dır", "dir", "dur", "dür"), "mevcut": ("tur", "tır", "tir", "tür")}
+
+
+def _keyword_pattern(keyword: str) -> re.Pattern:
+    """Word-boundary-wrapped pattern for a keyword/phrase. Plain substring
+    matching ("erik" in text) false-positives on fragments inside unrelated
+    words — e.g. "erik" (plum) matched inside "içerik" (content), "bağ"
+    (vineyard) matched inside "Bağlantı" (link), both from page footer
+    boilerplate. \b works correctly with Turkish characters (verified).
+    Keywords ending in "var"/"mevcut" get a flexible suffix instead of a
+    strict trailing boundary — see _COPULA_SUFFIXES."""
+    for base, suffixes in _COPULA_SUFFIXES.items():
+        if keyword.endswith(base):
+            prefix = re.escape(keyword[: -len(base)])
+            suffix_group = "|".join(suffixes)
+            return re.compile(r"\b" + prefix + re.escape(base) + r"(?:" + suffix_group + r")?\b")
+    return re.compile(r"\b" + re.escape(keyword) + r"\b")
+
+
 def _contains_any(text: str, keywords: list[str]) -> bool:
-    return any(k in text for k in keywords)
+    return any(_keyword_pattern(k).search(text) for k in keywords)
 
 
 # Turkish negation typically follows the keyword ("hisseli olarak alamazsınız"
@@ -42,7 +77,7 @@ _NEGATION_FOLLOWERS = [
 def _contains_unnegated(text: str, keyword: str) -> bool:
     """Like `keyword in text`, but False if a Turkish negation word follows
     the match within a short window — see _NEGATION_FOLLOWERS."""
-    for m in re.finditer(re.escape(keyword), text):
+    for m in _keyword_pattern(keyword).finditer(text):
         window = text[m.end(): m.end() + 40]
         if any(neg in window for neg in _NEGATION_FOLLOWERS):
             continue
@@ -64,7 +99,10 @@ def _word_followed_by_var(text: str, word_pattern: str, max_chars: int = 40) -> 
     common construction entirely. A character window (rather than
     word-tokenizing) avoids breaking on punctuation like "Yolu, suyu...".
     """
-    pattern = re.compile(word_pattern + r"([^.!?\n]{0," + str(max_chars) + r"}?)\b(var|mevcut)\b")
+    pattern = re.compile(
+        word_pattern + r"([^.!?\n]{0," + str(max_chars) + r"}?)"
+        r"\b(var(?:dır|dir|dur|dür)?|mevcut(?:tur|tır|tir|tür)?)\b"
+    )
     for m in pattern.finditer(text):
         between = m.group(1)
         if "yok" in between or "değil" in between:
@@ -123,17 +161,18 @@ def _parse_size_m2(specs: dict, text: str) -> float | None:
     return None
 
 
-def _classify_land_type(text: str, tree_count: int | None) -> str:
-    has_tree_keyword = any(kw in text for kw in ORCHARD_TREE_KEYWORDS)
-    if has_tree_keyword and (tree_count and tree_count > 0):
+def _classify_land_type(text: str, tree_count: int | None, tree_age: int | None) -> str:
+    has_strong_keyword = any(_keyword_pattern(kw).search(text) for kw in STRONG_ORCHARD_KEYWORDS)
+    has_any_tree_keyword = any(_keyword_pattern(kw).search(text) for kw in ORCHARD_TREE_KEYWORDS)
+    if has_strong_keyword or (has_any_tree_keyword and (tree_count or tree_age)):
         return "existing_orchard"
-    if has_tree_keyword:
+    if has_any_tree_keyword:
         return "mixed"
     return "raw_land"
 
 
 def _extract_tree_species(text: str) -> str | None:
-    found = [name for kw, name in ORCHARD_TREE_KEYWORDS.items() if kw in text]
+    found = [name for kw, name in ORCHARD_TREE_KEYWORDS.items() if _keyword_pattern(kw).search(text)]
     return ", ".join(sorted(set(found))) if found else None
 
 
@@ -163,7 +202,7 @@ def normalize(payload: dict) -> dict:
     description = payload.get("description", "") or ""
     page_text = payload.get("page_text", "") or ""
     raw_text = f"{description}\n{page_text}"
-    full_text = raw_text.lower()
+    full_text = _turkish_lower(raw_text)
 
     price = _extract_price_from_text(raw_text) or _parse_price(payload.get("price_raw"))
     size_m2 = _parse_size_m2(specs, full_text)
@@ -172,7 +211,7 @@ def normalize(payload: dict) -> dict:
     tree_count = _extract_tree_count(specs, full_text)
     tree_age = _extract_tree_age(specs, full_text)
     tree_species = _extract_tree_species(full_text)
-    land_type = _classify_land_type(full_text, tree_count)
+    land_type = _classify_land_type(full_text, tree_count, tree_age)
 
     if _contains_any_unnegated(full_text, IRRIGATION_POSITIVE) or _word_followed_by_var(full_text, r"\bsuyu?\b"):
         irrigation = "var"
@@ -185,7 +224,7 @@ def normalize(payload: dict) -> dict:
     # short, authoritative field. Scanning the whole page for these keywords
     # risks false positives from unrelated text elsewhere (footer links,
     # sidebar filters, similar-listings sections, etc.).
-    tapu_value = (specs.get("Tapu Durumu") or specs.get("Tapu Durum") or "").lower()
+    tapu_value = _turkish_lower(specs.get("Tapu Durumu") or specs.get("Tapu Durum") or "")
     tapu_source = tapu_value or full_text
 
     if _contains_any_unnegated(tapu_source, TAPU_NONE_KEYWORDS):

@@ -21,8 +21,16 @@ ORCHARD_TREE_KEYWORDS = {
     "ceviz": "walnut",
     "bağ": "vineyard",
     "üzüm": "grape",
+    "bahçe": "orchard/garden",
     "meyve bahçesi": "mixed orchard",
 }
+
+# Words that alone mean an established planting already exists — "place"
+# nouns (zeytinlik = "olive grove", bağ = "vineyard") rather than bare fruit
+# names (zeytin = "olive", the fruit — could just mean "suitable for olives").
+# These count as an existing orchard without needing a tree count or age;
+# the bare-fruit-name keywords above need that corroboration instead.
+STRONG_ORCHARD_KEYWORDS = {"zeytinlik", "bağ", "bahçe", "meyve bahçesi"}
 
 IRRIGATION_POSITIVE = [
     "sulama var", "sulu tarım", "sulanabilir", "kuyu var", "kuyulu",
