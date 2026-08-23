@@ -1,12 +1,20 @@
 const BACKEND_URL = "http://localhost:5001/api/capture";
 
 function extractListingData() {
+  const AEGEAN_PROVINCES = [
+    "İzmir", "Izmir", "Manisa", "Aydın", "Aydin", "Denizli",
+    "Muğla", "Mugla", "Uşak", "Usak", "Kütahya", "Kutahya",
+    "Afyonkarahisar", "Balıkesir", "Balikesir",
+  ];
+
   const specs = {};
 
   function addSpec(label, value) {
     label = (label || "").trim().replace(/:\s*$/, "");
     value = (value || "").trim();
-    if (label && value && label.length < 40 && value.length < 200 && label !== value) {
+    // Multi-line values are almost always a footer/nav menu swept up by the
+    // generic "li with 2 children" scan below, not a real spec row.
+    if (label && value && label.length < 40 && value.length < 200 && label !== value && !value.includes("\n")) {
       specs[label] = value;
     }
   }
@@ -36,17 +44,31 @@ function extractListingData() {
     if (m) priceRaw = m[1];
   }
 
-  const descEl = document.querySelector(
-    '.classifiedDescription, #classifiedDescription, [class*="description"]'
-  );
-  const description = descEl ? descEl.innerText : "";
+  // Location: walk breadcrumb-style links looking for a province name, then
+  // take the next couple of links as district/neighborhood. Doing this over
+  // real anchor elements (rather than regex over flattened page text) avoids
+  // depending on whether "/" separators are real text or CSS decoration.
+  let province = null, district = null, neighborhood = null;
+  const links = Array.from(document.querySelectorAll("a"));
+  for (let i = 0; i < links.length; i++) {
+    const text = links[i].innerText?.trim();
+    if (AEGEAN_PROVINCES.includes(text)) {
+      province = text;
+      district = links[i + 1]?.innerText?.trim() || null;
+      neighborhood = links[i + 2]?.innerText?.trim() || null;
+      break;
+    }
+  }
 
   return {
     url: location.href,
     title,
     price_raw: priceRaw,
     specs,
-    description,
+    province,
+    district,
+    neighborhood,
+    description: "",
     page_text: document.body.innerText.slice(0, 20000),
   };
 }

@@ -39,6 +39,29 @@ def _contains_any(text: str, keywords: list[str]) -> bool:
     return any(k in text for k in keywords)
 
 
+# Turkish negation typically follows the keyword ("hisseli olarak alamazsınız"
+# = "you CANNOT buy it as shared" — the opposite of a plain "hisseli" match).
+_NEGATION_FOLLOWERS = [
+    "alamazsınız", "alamaz", "alınamaz", "satılmaz", "olamaz",
+    "değildir", "değil", "verilmez", "yapılmaz", "bulunmamaktadır", "yoktur",
+]
+
+
+def _contains_unnegated(text: str, keyword: str) -> bool:
+    """Like `keyword in text`, but False if a Turkish negation word follows
+    the match within a short window — see _NEGATION_FOLLOWERS."""
+    for m in re.finditer(re.escape(keyword), text):
+        window = text[m.end(): m.end() + 40]
+        if any(neg in window for neg in _NEGATION_FOLLOWERS):
+            continue
+        return True
+    return False
+
+
+def _contains_any_unnegated(text: str, keywords: list[str]) -> bool:
+    return any(_contains_unnegated(text, k) for k in keywords)
+
+
 def _parse_price(raw) -> float | None:
     if raw is None:
         return None
@@ -137,7 +160,11 @@ def normalize(payload: dict) -> dict:
     size_m2 = _parse_size_m2(specs, full_text)
     size_donum = round(size_m2 / 1000, 3) if size_m2 else None
 
-    province, district, neighborhood = _extract_location(raw_text)
+    # The extension walks real breadcrumb links for this now, which is far
+    # more reliable than regex over flattened page text (sahibinden's "/"
+    # breadcrumb separators turned out to be CSS decoration, not real text,
+    # so the text-pattern fallback below rarely actually matches anything).
+    text_province, text_district, text_neighborhood = _extract_location(raw_text)
 
     tree_count = _extract_tree_count(specs, full_text)
     tree_age = _extract_tree_age(specs, full_text)
@@ -151,16 +178,23 @@ def normalize(payload: dict) -> dict:
     else:
         irrigation = "unknown"
 
-    if _contains_any(full_text, TAPU_NONE_KEYWORDS):
+    # Prefer the "Tapu Durumu" spec value directly when we have it — it's a
+    # short, authoritative field. Scanning the whole page for these keywords
+    # risks false positives from unrelated text elsewhere (footer links,
+    # sidebar filters, similar-listings sections, etc.).
+    tapu_value = (specs.get("Tapu Durumu") or specs.get("Tapu Durum") or "").lower()
+    tapu_source = tapu_value or full_text
+
+    if _contains_any_unnegated(tapu_source, TAPU_NONE_KEYWORDS):
         tapu_status = "none"
-    elif _contains_any(full_text, TAPU_SHARED_KEYWORDS):
+    elif _contains_any_unnegated(tapu_source, TAPU_SHARED_KEYWORDS):
         tapu_status = "hisseli"
-    elif _contains_any(full_text, TAPU_CLEAN_KEYWORDS):
+    elif _contains_any_unnegated(tapu_source, TAPU_CLEAN_KEYWORDS):
         tapu_status = "mustakil"
     else:
         tapu_status = "unknown"
 
-    has_lien = _contains_any(full_text, LIEN_KEYWORDS)
+    has_lien = _contains_any_unnegated(tapu_value, LIEN_KEYWORDS) or _contains_any_unnegated(full_text, LIEN_KEYWORDS)
     road_access = _contains_any(full_text, ROAD_ACCESS_KEYWORDS)
     electricity = _contains_any(full_text, ELECTRICITY_KEYWORDS)
 
@@ -171,9 +205,9 @@ def normalize(payload: dict) -> dict:
         "currency": payload.get("currency", "TRY"),
         "size_m2": size_m2,
         "size_donum": size_donum,
-        "province": specs.get("İl") or province or payload.get("province"),
-        "district": specs.get("İlçe") or district or payload.get("district"),
-        "neighborhood": specs.get("Mahalle") or neighborhood or payload.get("neighborhood"),
+        "province": payload.get("province") or specs.get("İl") or text_province,
+        "district": payload.get("district") or specs.get("İlçe") or text_district,
+        "neighborhood": payload.get("neighborhood") or specs.get("Mahalle") or text_neighborhood,
         "land_type": land_type,
         "tree_species": tree_species,
         "tree_count": tree_count,
