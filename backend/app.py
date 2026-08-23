@@ -54,6 +54,28 @@ def _apply_filters(scored, args):
     return scored
 
 
+SORT_FIELDS = {
+    "score": "composite",
+    "price": "price",
+    "price_per_donum": "price_per_donum",
+    "size": "size_donum",
+}
+
+
+def _apply_sort(scored, args):
+    field = SORT_FIELDS.get(args.get("sort", "score"), "composite")
+    ascending = args.get("dir") == "asc"
+
+    def sort_key(listing):
+        value = listing.get(field)
+        # None values always sort last, regardless of direction.
+        if value is None:
+            return (1, 0)
+        return (0, value if ascending else -value)
+
+    return sorted(scored, key=sort_key)
+
+
 @app.route("/")
 def dashboard():
     listings = db.all_listings()
@@ -63,11 +85,14 @@ def dashboard():
 
     selected_province = request.args.get("province") or ""
     selected_district = request.args.get("district") or ""
+    selected_sort = request.args.get("sort", "score")
+    selected_dir = request.args.get("dir", "desc")
 
     district_pool = [l for l in scored if not selected_province or l.get("province") == selected_province]
     districts = sorted({l["district"] for l in district_pool if l.get("district")})
 
     filtered = _apply_filters(scored, request.args)
+    filtered = _apply_sort(filtered, request.args)
 
     return render_template(
         "dashboard.html",
@@ -77,6 +102,8 @@ def dashboard():
         districts=districts,
         selected_province=selected_province,
         selected_district=selected_district,
+        selected_sort=selected_sort,
+        selected_dir=selected_dir,
     )
 
 

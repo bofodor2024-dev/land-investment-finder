@@ -24,6 +24,7 @@ def score_listing(listing: dict, group_averages: dict) -> dict:
 
     # --- value: price/donum vs comparable group average (lower is better) ---
     value_score = 50.0
+    price_per_donum = None
     if listing.get("size_donum") and listing.get("price"):
         price_per_donum = listing["price"] / listing["size_donum"]
         avg = group_averages.get(_group_key(listing))
@@ -92,6 +93,7 @@ def score_listing(listing: dict, group_averages: dict) -> dict:
         "composite": round(composite, 1),
         "breakdown": breakdown,
         "red_flags": red_flags,
+        "price_per_donum": round(price_per_donum, 1) if price_per_donum is not None else None,
     }
 
 

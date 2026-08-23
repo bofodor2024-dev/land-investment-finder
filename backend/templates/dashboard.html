@@ -27,14 +27,29 @@
   .filters select { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; background: white; }
   .filters a.clear { font-size: 0.8rem; color: #777; text-decoration: none; }
   .filters a.clear:hover { text-decoration: underline; }
+  th a.sort-link { color: #fff; text-decoration: none; }
+  th a.sort-link:hover { text-decoration: underline; }
+  th small { display: block; font-weight: normal; margin-top: 0.1rem; }
+  th small a { color: #cfc9ba; text-decoration: none; }
+  th small a:hover { text-decoration: underline; }
+  th small a.active { color: #fff; font-weight: 600; }
+  th a.active { text-decoration: underline; }
 </style>
 </head>
 <body>
+  {% macro sort_url(field) -%}
+    {%- set params = request.args.to_dict() -%}
+    {%- set new_dir = 'asc' if (selected_sort == field and selected_dir != 'asc') else 'desc' -%}
+    {%- set _ = params.update({'sort': field, 'dir': new_dir}) -%}
+    ?{{ params|urlencode }}
+  {%- endmacro %}
   <h1>Land Investment Finder — Aegean Orchards</h1>
   <div class="sub">
-    {{ listings|length }} of {{ total_count }} captured listing(s) shown, sorted by score.
+    {{ listings|length }} of {{ total_count }} captured listing(s) shown.
   </div>
   <form class="filters" method="get">
+    <input type="hidden" name="sort" value="{{ selected_sort }}">
+    <input type="hidden" name="dir" value="{{ selected_dir }}">
     <select name="province" onchange="this.form.district.value=''; this.form.submit()">
       <option value="">All provinces</option>
       {% for p in provinces %}
@@ -54,10 +69,13 @@
   <table>
     <thead>
       <tr>
-        <th>Score</th>
+        <th><a class="sort-link {{ 'active' if selected_sort == 'score' else '' }}" href="{{ sort_url('score') }}">Score{% if selected_sort == 'score' %}{{ ' ▲' if selected_dir == 'asc' else ' ▼' }}{% endif %}</a></th>
         <th>Title / Location</th>
-        <th>Price</th>
-        <th>Size</th>
+        <th>
+          <a class="sort-link {{ 'active' if selected_sort == 'price' else '' }}" href="{{ sort_url('price') }}">Price{% if selected_sort == 'price' %}{{ ' ▲' if selected_dir == 'asc' else ' ▼' }}{% endif %}</a>
+          <small><a class="{{ 'active' if selected_sort == 'price_per_donum' else '' }}" href="{{ sort_url('price_per_donum') }}">/dönüm{% if selected_sort == 'price_per_donum' %}{{ ' ▲' if selected_dir == 'asc' else ' ▼' }}{% endif %}</a></small>
+        </th>
+        <th><a class="sort-link {{ 'active' if selected_sort == 'size' else '' }}" href="{{ sort_url('size') }}">Size{% if selected_sort == 'size' %}{{ ' ▲' if selected_dir == 'asc' else ' ▼' }}{% endif %}</a></th>
         <th>Type</th>
         <th>Irrigation</th>
         <th>Tapu</th>
