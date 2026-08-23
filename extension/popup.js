@@ -43,27 +43,37 @@ function extractListingData() {
   // Rather than matching province/district names against a hardcoded city
   // list (which just means missing whatever city we didn't think to list —
   // e.g. Çanakkale isn't "Aegean" by strict geography but plenty of olive
-  // land is there), anchor on the taxonomy words instead: they're a small,
-  // stable set sahibinden itself defines, and whatever links immediately
-  // follow a run of them are the location trail, whatever it says.
+  // land is there), anchor on the taxonomy words instead.
+  //
+  // Just matching "a run of 2+ category-ish words" isn't enough on its own
+  // though — sahibinden also has a site-wide category mega-menu (Emlak,
+  // Vasıta, Yedek Parça, İkinci El ve Sıfır Alışveriş, ...) elsewhere on
+  // the page, and that menu's run of words is *longer* than the real
+  // 4-word breadcrumb, so a "pick the longest run" rule grabs the wrong
+  // one. "Anasayfa" (Home) only appears as the very first breadcrumb
+  // crumb, never inside that category menu, so anchor the run there
+  // specifically instead of picking whichever run is longest.
   const BREADCRUMB_MARKERS = new Set([
-    "Anasayfa", "Emlak", "Arsa", "Satılık", "Kiralık", "Tarla", "Konut",
+    "Emlak", "Arsa", "Satılık", "Kiralık", "Tarla", "Konut",
     "İşyeri", "Bağ", "Bahçe", "Devremülk", "Turistik Tesis",
   ]);
   const linkText = (a) => (a?.innerText || "").trim();
   const links = Array.from(document.querySelectorAll("a"));
 
   let bestRunEnd = -1, bestRunLen = 0;
-  for (let i = 0; i < links.length; ) {
-    if (!BREADCRUMB_MARKERS.has(linkText(links[i]))) { i++; continue; }
-    let j = i;
+  for (let i = 0; i < links.length; i++) {
+    if (linkText(links[i]) !== "Anasayfa") continue;
+    let j = i + 1;
     while (j < links.length && BREADCRUMB_MARKERS.has(linkText(links[j]))) j++;
-    if (j - i > bestRunLen) { bestRunLen = j - i; bestRunEnd = j; }
-    i = j;
+    const runLen = j - i; // includes the "Anasayfa" link itself
+    if (runLen > bestRunLen) { bestRunLen = runLen; bestRunEnd = j; }
   }
 
+  // Require at least "Anasayfa" + 2 category words (e.g. Emlak, Arsa)
+  // before the location chain starts, so a bare/interrupted "Anasayfa"
+  // link elsewhere (e.g. the site logo) doesn't false-positive.
   let province = null, district = null, neighborhood = null;
-  if (bestRunLen >= 2) {
+  if (bestRunLen >= 3) {
     province = linkText(links[bestRunEnd]) || null;
     district = linkText(links[bestRunEnd + 1]) || null;
     neighborhood = linkText(links[bestRunEnd + 2]) || null;
