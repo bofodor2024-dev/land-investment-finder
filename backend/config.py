@@ -1,3 +1,5 @@
+import os
+
 AEGEAN_PROVINCES = [
     "İzmir", "Izmir", "Manisa", "Aydın", "Aydin", "Denizli",
     "Muğla", "Mugla", "Uşak", "Usak", "Kütahya", "Kutahya",
@@ -41,4 +43,6 @@ SCORE_WEIGHTS = {
     "access": 0.10,
 }
 
-DB_PATH = "land_finder.db"
+# Override with LAND_FINDER_DB=/path/to/other.db for testing/dev work, so
+# real captured data is never at risk of being reset or overwritten.
+DB_PATH = os.environ.get("LAND_FINDER_DB", "land_finder.db")
