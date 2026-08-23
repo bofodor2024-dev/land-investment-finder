@@ -24,15 +24,20 @@ ORCHARD_TREE_KEYWORDS = {
     "meyve bahçesi": "mixed orchard",
 }
 
-IRRIGATION_POSITIVE = ["sulama var", "sulu tarım", "sulanabilir", "kuyu var", "kuyulu", "damla sulama", "artezyen"]
-IRRIGATION_NEGATIVE = ["sulama yok", "susuz", "kuru tarım"]
+IRRIGATION_POSITIVE = [
+    "sulama var", "sulu tarım", "sulanabilir", "kuyu var", "kuyulu",
+    "damla sulama", "artezyen", "suyu var", "su var", "suyu mevcut",
+]
+IRRIGATION_NEGATIVE = ["sulama yok", "susuz", "kuru tarım", "suyu yok", "su yok"]
 
 TAPU_SHARED_KEYWORDS = ["hisseli tapu", "hisseli", "hisse tapu"]
 TAPU_CLEAN_KEYWORDS = ["müstakil tapu", "mustakil tapu", "ferdi tapu"]
 TAPU_NONE_KEYWORDS = ["tapu kaydı yok", "tapu kaydi yok", "tapu yok", "tapusuz"]
 LIEN_KEYWORDS = ["ipotekli", "ipotek var", "haciz", "hacizli", "rehinli"]
 
-ROAD_ACCESS_KEYWORDS = ["yola cephe", "yol cepheli", "asfalt yol", "yola sıfır"]
+ROAD_ACCESS_KEYWORDS = [
+    "yola cephe", "yol cepheli", "asfalt yol", "yola sıfır", "yolu var", "yol var", "yolu mevcut",
+]
 ELECTRICITY_KEYWORDS = ["elektrik var", "elektrik mevcut"]
 
 SCORE_WEIGHTS = {

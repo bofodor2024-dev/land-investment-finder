@@ -54,6 +54,30 @@ def _contains_any_unnegated(text: str, keywords: list[str]) -> bool:
     return any(_contains_unnegated(text, k) for k in keywords)
 
 
+def _word_followed_by_var(text: str, word_pattern: str, max_chars: int = 40) -> bool:
+    """True if `word_pattern` is followed (within a short character window,
+    not crossing a sentence boundary) by "var" or "mevcut" — handles
+    Turkish's shared-verb enumeration, e.g. "yolu ve suyu var" (road AND
+    water both exist) or "yolu, suyu ve elektriği var", where the target
+    word and "var" aren't adjacent because other nouns share the same
+    trailing "var". A plain substring check for "yolu var" misses this
+    common construction entirely. A character window (rather than
+    word-tokenizing) avoids breaking on punctuation like "Yolu, suyu...".
+    """
+    pattern = re.compile(word_pattern + r"([^.!?\n]{0," + str(max_chars) + r"}?)\b(var|mevcut)\b")
+    for m in pattern.finditer(text):
+        between = m.group(1)
+        if "yok" in between or "değil" in between:
+            # The target word's own clause was negated before reaching this
+            # "var" — it belongs to a different, later noun.
+            continue
+        after = text[m.end(): m.end() + 40]
+        if any(neg in after for neg in _NEGATION_FOLLOWERS):
+            continue
+        return True
+    return False
+
+
 def _parse_price(raw) -> float | None:
     if raw is None:
         return None
@@ -150,7 +174,7 @@ def normalize(payload: dict) -> dict:
     tree_species = _extract_tree_species(full_text)
     land_type = _classify_land_type(full_text, tree_count)
 
-    if _contains_any(full_text, IRRIGATION_POSITIVE):
+    if _contains_any_unnegated(full_text, IRRIGATION_POSITIVE) or _word_followed_by_var(full_text, r"\bsuyu?\b"):
         irrigation = "var"
     elif _contains_any(full_text, IRRIGATION_NEGATIVE):
         irrigation = "yok"
@@ -174,8 +198,8 @@ def normalize(payload: dict) -> dict:
         tapu_status = "unknown"
 
     has_lien = _contains_any_unnegated(tapu_value, LIEN_KEYWORDS) or _contains_any_unnegated(full_text, LIEN_KEYWORDS)
-    road_access = _contains_any(full_text, ROAD_ACCESS_KEYWORDS)
-    electricity = _contains_any(full_text, ELECTRICITY_KEYWORDS)
+    road_access = _contains_any_unnegated(full_text, ROAD_ACCESS_KEYWORDS) or _word_followed_by_var(full_text, r"\byolu?\b")
+    electricity = _contains_any_unnegated(full_text, ELECTRICITY_KEYWORDS) or _word_followed_by_var(full_text, r"\belektri(?:k|ği)\b")
 
     province = payload.get("province") or specs.get("İl")
     district = payload.get("district") or specs.get("İlçe")
