@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Land Investment Finder</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, Segoe UI, sans-serif; margin: 2rem; background: #f7f6f3; color: #222; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  .sub { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; }
+  table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: top; }
+  th { background: #2f2a20; color: #fff; position: sticky; top: 0; }
+  tr:hover { background: #faf8f2; }
+  .score { font-weight: 700; font-size: 1.05rem; }
+  .score-high { color: #1a7a3c; }
+  .score-mid { color: #a67c00; }
+  .score-low { color: #b3392a; }
+  .tag { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.72rem; margin: 0.1rem 0.15rem 0 0; background: #eee; }
+  .tag.orchard { background: #dff0d8; color: #1a7a3c; }
+  .tag.raw { background: #f0ead8; color: #8a6d1c; }
+  .flag { display: block; color: #b3392a; font-size: 0.75rem; }
+  a.listing-link { color: #1a5276; text-decoration: none; }
+  a.listing-link:hover { text-decoration: underline; }
+  .breakdown { font-size: 0.72rem; color: #777; }
+</style>
+</head>
+<body>
+  <h1>Land Investment Finder — Aegean Orchards</h1>
+  <div class="sub">{{ listings|length }} captured listing(s), sorted by score.</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Score</th>
+        <th>Title / Location</th>
+        <th>Price</th>
+        <th>Size</th>
+        <th>Type</th>
+        <th>Irrigation</th>
+        <th>Tapu</th>
+        <th>Flags</th>
+        <th>Breakdown</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in listings %}
+      <tr>
+        <td>
+          <span class="score {{ 'score-high' if l.composite >= 70 else ('score-mid' if l.composite >= 45 else 'score-low') }}">
+            {{ l.composite }}
+          </span>
+        </td>
+        <td>
+          <a class="listing-link" href="{{ l.url }}" target="_blank">{{ l.title or l.url }}</a><br>
+          <small>{{ l.district or '' }}{{ ', ' if l.district and l.province }}{{ l.province or '' }}</small>
+        </td>
+        <td>
+          {% if l.price %}{{ '{:,.0f}'.format(l.price) }} {{ l.currency }}
+            {% if l.size_donum %}<br><small>{{ '{:,.0f}'.format(l.price / l.size_donum) }} / dönüm</small>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ l.size_donum ~ ' dönüm' if l.size_donum else (l.size_m2 ~ ' m²' if l.size_m2 else '—') }}</td>
+        <td>
+          <span class="tag {{ 'orchard' if l.land_type == 'existing_orchard' else 'raw' }}">{{ l.land_type or 'unknown' }}</span>
+          {% if l.tree_species %}<br><small>{{ l.tree_species }}{% if l.tree_count %} ({{ l.tree_count }} trees{% if l.tree_age_years %}, ~{{ l.tree_age_years }}y{% endif %}){% endif %}</small>{% endif %}
+        </td>
+        <td>{{ l.irrigation }}</td>
+        <td>{{ l.tapu_status }}{% if l.has_lien %} <span class="flag">⚠ lien</span>{% endif %}</td>
+        <td>
+          {% for f in l.red_flags %}<span class="flag">⚠ {{ f }}</span>{% endfor %}
+        </td>
+        <td class="breakdown">
+          value {{ l.breakdown.value }} · maturity {{ l.breakdown.maturity }} · irr {{ l.breakdown.irrigation }} · tapu {{ l.breakdown.tapu }} · access {{ l.breakdown.access }}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9">No listings captured yet. Browse a listing on sahibinden.com and click "Capture Listing" in the extension.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

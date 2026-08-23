@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Land Investment Capture",
+  "version": "1.0.0",
+  "description": "Capture the sahibinden.com listing you're viewing into your local Land Investment Finder app.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["*://*.sahibinden.com/*", "http://127.0.0.1:5001/*", "http://localhost:5001/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Capture this listing"
+  }
+}
