@@ -48,16 +48,24 @@ function extractListingData() {
   // take the next couple of links as district/neighborhood. Doing this over
   // real anchor elements (rather than regex over flattened page text) avoids
   // depending on whether "/" separators are real text or CSS decoration.
+  //
+  // A plain "find any link matching a province name" is too loose — pages
+  // also have unrelated nav (a "popular cities" quick-links list, etc.) that
+  // can contain a province name too. Require one of the few preceding links
+  // to look like breadcrumb taxonomy (Emlak/Arsa/Satılık/...) so we don't
+  // grab the wrong "İzmir" and its unrelated neighboring link.
+  const BREADCRUMB_MARKERS = ["Emlak", "Arsa", "Satılık", "Tarla", "Kiralık", "Konut", "İşyeri", "Bağ", "Bahçe"];
   let province = null, district = null, neighborhood = null;
   const links = Array.from(document.querySelectorAll("a"));
   for (let i = 0; i < links.length; i++) {
     const text = links[i].innerText?.trim();
-    if (AEGEAN_PROVINCES.includes(text)) {
-      province = text;
-      district = links[i + 1]?.innerText?.trim() || null;
-      neighborhood = links[i + 2]?.innerText?.trim() || null;
-      break;
-    }
+    if (!AEGEAN_PROVINCES.includes(text)) continue;
+    const precedingTexts = links.slice(Math.max(0, i - 4), i).map((a) => a.innerText?.trim());
+    if (!precedingTexts.some((t) => BREADCRUMB_MARKERS.includes(t))) continue;
+    province = text;
+    district = links[i + 1]?.innerText?.trim() || null;
+    neighborhood = links[i + 2]?.innerText?.trim() || null;
+    break;
   }
 
   return {

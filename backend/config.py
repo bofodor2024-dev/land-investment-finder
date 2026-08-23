@@ -6,6 +6,16 @@ AEGEAN_PROVINCES = [
     "Afyonkarahisar", "Balıkesir", "Balikesir",
 ]
 
+# Turkey's other major provinces — used to sanity-check extracted district
+# names. A "district" that's actually one of these is a sign the breadcrumb
+# walker grabbed the wrong link (e.g. a "popular cities" nav list) rather
+# than the real location trail.
+OTHER_MAJOR_PROVINCES = [
+    "İstanbul", "Istanbul", "Ankara", "Adana", "Antalya", "Bursa", "Konya",
+    "Gaziantep", "Mersin", "Kayseri", "Eskişehir", "Eskisehir", "Samsun",
+    "Kocaeli", "Trabzon", "Şanlıurfa", "Sanliurfa", "Diyarbakır", "Diyarbakir",
+]
+
 ORCHARD_TREE_KEYWORDS = {
     "zeytin": "olive",
     "zeytinlik": "olive",

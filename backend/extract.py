@@ -17,11 +17,14 @@ from config import (
     IRRIGATION_POSITIVE,
     LIEN_KEYWORDS,
     ORCHARD_TREE_KEYWORDS,
+    OTHER_MAJOR_PROVINCES,
     ROAD_ACCESS_KEYWORDS,
     TAPU_CLEAN_KEYWORDS,
     TAPU_NONE_KEYWORDS,
     TAPU_SHARED_KEYWORDS,
 )
+
+_KNOWN_PROVINCE_NAMES = {p.lower() for p in AEGEAN_PROVINCES + OTHER_MAJOR_PROVINCES}
 
 # Matches the "İzmir / Torbalı / Ahmetli Mh." breadcrumb-style line sahibinden
 # shows next to the price, since İl/İlçe/Mahalle aren't reliably in the spec table.
@@ -198,6 +201,15 @@ def normalize(payload: dict) -> dict:
     road_access = _contains_any(full_text, ROAD_ACCESS_KEYWORDS)
     electricity = _contains_any(full_text, ELECTRICITY_KEYWORDS)
 
+    district = payload.get("district") or specs.get("İlçe") or text_district
+    neighborhood = payload.get("neighborhood") or specs.get("Mahalle") or text_neighborhood
+    if (district or "").lower() in _KNOWN_PROVINCE_NAMES:
+        # A "district" that's actually a province name means the breadcrumb
+        # walker latched onto the wrong link chain — discard rather than
+        # store obviously-wrong location data.
+        district = None
+        neighborhood = None
+
     return {
         "url": payload["url"],
         "title": payload.get("title"),
@@ -206,8 +218,8 @@ def normalize(payload: dict) -> dict:
         "size_m2": size_m2,
         "size_donum": size_donum,
         "province": payload.get("province") or specs.get("İl") or text_province,
-        "district": payload.get("district") or specs.get("İlçe") or text_district,
-        "neighborhood": payload.get("neighborhood") or specs.get("Mahalle") or text_neighborhood,
+        "district": district,
+        "neighborhood": neighborhood,
         "land_type": land_type,
         "tree_species": tree_species,
         "tree_count": tree_count,
