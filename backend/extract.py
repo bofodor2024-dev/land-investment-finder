@@ -11,6 +11,7 @@ import json
 import re
 
 from config import (
+    AEGEAN_PROVINCES,
     ELECTRICITY_KEYWORDS,
     IRRIGATION_NEGATIVE,
     IRRIGATION_POSITIVE,
@@ -18,8 +19,20 @@ from config import (
     ORCHARD_TREE_KEYWORDS,
     ROAD_ACCESS_KEYWORDS,
     TAPU_CLEAN_KEYWORDS,
+    TAPU_NONE_KEYWORDS,
     TAPU_SHARED_KEYWORDS,
 )
+
+# Matches the "İzmir / Torbalı / Ahmetli Mh." breadcrumb-style line sahibinden
+# shows next to the price, since İl/İlçe/Mahalle aren't reliably in the spec table.
+_LOCATION_RE = re.compile(
+    r"(" + "|".join(re.escape(p) for p in sorted(set(AEGEAN_PROVINCES), key=len, reverse=True)) + r")"
+    r"\s*/\s*([^\n/,]{2,40}?)\s*/\s*([^\n/,]{2,40})"
+)
+
+# Total price is shown as "12.250.000 TL"; the per-m² price nearby ("69 TL/m²")
+# has no thousands separator and is followed by "/", so this pattern skips it.
+_PRICE_TL_RE = re.compile(r"(\d{1,3}(?:\.\d{3})+)\s*TL(?!\s*/)")
 
 
 def _contains_any(text: str, keywords: list[str]) -> bool:
@@ -37,6 +50,27 @@ def _parse_price(raw) -> float | None:
         return float(s)
     except ValueError:
         return None
+
+
+def _extract_price_from_text(text: str) -> float | None:
+    """Total listing price, picked as the largest properly-thousands-separated
+    'X.XXX TL' amount on the page. Preferred over the element-selector guess
+    because sahibinden also shows a much smaller per-m² price nearby, and
+    which CSS class holds which figure isn't something we could verify."""
+    candidates = []
+    for m in _PRICE_TL_RE.finditer(text):
+        try:
+            candidates.append(float(m.group(1).replace(".", "")))
+        except ValueError:
+            continue
+    return max(candidates) if candidates else None
+
+
+def _extract_location(text: str) -> tuple[str | None, str | None, str | None]:
+    m = _LOCATION_RE.search(text)
+    if not m:
+        return None, None, None
+    return tuple(g.strip() for g in m.groups())
 
 
 def _parse_size_m2(specs: dict, text: str) -> float | None:
@@ -96,11 +130,14 @@ def normalize(payload: dict) -> dict:
     specs = payload.get("specs", {}) or {}
     description = payload.get("description", "") or ""
     page_text = payload.get("page_text", "") or ""
-    full_text = f"{description}\n{page_text}".lower()
+    raw_text = f"{description}\n{page_text}"
+    full_text = raw_text.lower()
 
-    price = _parse_price(payload.get("price_raw"))
+    price = _extract_price_from_text(raw_text) or _parse_price(payload.get("price_raw"))
     size_m2 = _parse_size_m2(specs, full_text)
     size_donum = round(size_m2 / 1000, 3) if size_m2 else None
+
+    province, district, neighborhood = _extract_location(raw_text)
 
     tree_count = _extract_tree_count(specs, full_text)
     tree_age = _extract_tree_age(specs, full_text)
@@ -114,7 +151,9 @@ def normalize(payload: dict) -> dict:
     else:
         irrigation = "unknown"
 
-    if _contains_any(full_text, TAPU_SHARED_KEYWORDS):
+    if _contains_any(full_text, TAPU_NONE_KEYWORDS):
+        tapu_status = "none"
+    elif _contains_any(full_text, TAPU_SHARED_KEYWORDS):
         tapu_status = "hisseli"
     elif _contains_any(full_text, TAPU_CLEAN_KEYWORDS):
         tapu_status = "mustakil"
@@ -132,9 +171,9 @@ def normalize(payload: dict) -> dict:
         "currency": payload.get("currency", "TRY"),
         "size_m2": size_m2,
         "size_donum": size_donum,
-        "province": specs.get("İl") or payload.get("province"),
-        "district": specs.get("İlçe") or payload.get("district"),
-        "neighborhood": specs.get("Mahalle") or payload.get("neighborhood"),
+        "province": specs.get("İl") or province or payload.get("province"),
+        "district": specs.get("İlçe") or district or payload.get("district"),
+        "neighborhood": specs.get("Mahalle") or neighborhood or payload.get("neighborhood"),
         "land_type": land_type,
         "tree_species": tree_species,
         "tree_count": tree_count,

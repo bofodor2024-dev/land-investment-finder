@@ -23,11 +23,34 @@
   a.listing-link { color: #1a5276; text-decoration: none; }
   a.listing-link:hover { text-decoration: underline; }
   .breakdown { font-size: 0.72rem; color: #777; }
+  .filters { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 1.2rem; }
+  .filters select { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; background: white; }
+  .filters a.clear { font-size: 0.8rem; color: #777; text-decoration: none; }
+  .filters a.clear:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
   <h1>Land Investment Finder — Aegean Orchards</h1>
-  <div class="sub">{{ listings|length }} captured listing(s), sorted by score.</div>
+  <div class="sub">
+    {{ listings|length }} of {{ total_count }} captured listing(s) shown, sorted by score.
+  </div>
+  <form class="filters" method="get">
+    <select name="province" onchange="this.form.district.value=''; this.form.submit()">
+      <option value="">All provinces</option>
+      {% for p in provinces %}
+      <option value="{{ p }}" {{ 'selected' if p == selected_province else '' }}>{{ p }}</option>
+      {% endfor %}
+    </select>
+    <select name="district" onchange="this.form.submit()">
+      <option value="">All districts</option>
+      {% for d in districts %}
+      <option value="{{ d }}" {{ 'selected' if d == selected_district else '' }}>{{ d }}</option>
+      {% endfor %}
+    </select>
+    {% if selected_province or selected_district %}
+    <a class="clear" href="/">Clear filters</a>
+    {% endif %}
+  </form>
   <table>
     <thead>
       <tr>

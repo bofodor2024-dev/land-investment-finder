@@ -66,6 +66,13 @@ def score_listing(listing: dict, group_averages: dict) -> dict:
     elif tapu == "hisseli":
         tapu_score = 20.0
         red_flags.append("Shared (hisseli) title deed")
+    elif tapu == "none":
+        tapu_score = 0.0
+        red_flags.append(
+            "No title deed record (Tapu Kaydı Yok) — often unregistered "
+            "forest/treasury/pasture land sold on possession, not real "
+            "ownership. Get legal counsel before proceeding."
+        )
     if listing.get("has_lien"):
         tapu_score = min(tapu_score, 5.0)
         red_flags.append("Lien/mortgage flagged on listing (ipotek/haciz)")

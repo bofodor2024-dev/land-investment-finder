@@ -34,6 +34,7 @@ def capture():
 def api_listings():
     listings = db.all_listings()
     scored = score_all(listings)
+    scored = _apply_filters(scored, request.args)
     return jsonify(scored)
 
 
@@ -43,11 +44,40 @@ def archive_listing(listing_id):
     return jsonify({"ok": True})
 
 
+def _apply_filters(scored, args):
+    province = args.get("province") or ""
+    district = args.get("district") or ""
+    if province:
+        scored = [l for l in scored if (l.get("province") or "") == province]
+    if district:
+        scored = [l for l in scored if (l.get("district") or "") == district]
+    return scored
+
+
 @app.route("/")
 def dashboard():
     listings = db.all_listings()
-    scored = score_all(listings)
-    return render_template("dashboard.html", listings=scored)
+    scored = score_all(listings)  # scored against the full captured set, before filtering
+
+    provinces = sorted({l["province"] for l in scored if l.get("province")})
+
+    selected_province = request.args.get("province") or ""
+    selected_district = request.args.get("district") or ""
+
+    district_pool = [l for l in scored if not selected_province or l.get("province") == selected_province]
+    districts = sorted({l["district"] for l in district_pool if l.get("district")})
+
+    filtered = _apply_filters(scored, request.args)
+
+    return render_template(
+        "dashboard.html",
+        listings=filtered,
+        total_count=len(scored),
+        provinces=provinces,
+        districts=districts,
+        selected_province=selected_province,
+        selected_district=selected_district,
+    )
 
 
 if __name__ == "__main__":

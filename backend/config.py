@@ -27,6 +27,7 @@ IRRIGATION_NEGATIVE = ["sulama yok", "susuz", "kuru tarım"]
 
 TAPU_SHARED_KEYWORDS = ["hisseli tapu", "hisseli", "hisse tapu"]
 TAPU_CLEAN_KEYWORDS = ["müstakil tapu", "mustakil tapu", "ferdi tapu"]
+TAPU_NONE_KEYWORDS = ["tapu kaydı yok", "tapu kaydi yok", "tapu yok", "tapusuz"]
 LIEN_KEYWORDS = ["ipotekli", "ipotek var", "haciz", "hacizli", "rehinli"]
 
 ROAD_ACCESS_KEYWORDS = ["yola cephe", "yol cepheli", "asfalt yol", "yola sıfır"]
