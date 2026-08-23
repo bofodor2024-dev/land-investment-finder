@@ -11,26 +11,15 @@ import json
 import re
 
 from config import (
-    AEGEAN_PROVINCES,
     ELECTRICITY_KEYWORDS,
     IRRIGATION_NEGATIVE,
     IRRIGATION_POSITIVE,
     LIEN_KEYWORDS,
     ORCHARD_TREE_KEYWORDS,
-    OTHER_MAJOR_PROVINCES,
     ROAD_ACCESS_KEYWORDS,
     TAPU_CLEAN_KEYWORDS,
     TAPU_NONE_KEYWORDS,
     TAPU_SHARED_KEYWORDS,
-)
-
-_KNOWN_PROVINCE_NAMES = {p.lower() for p in AEGEAN_PROVINCES + OTHER_MAJOR_PROVINCES}
-
-# Matches the "İzmir / Torbalı / Ahmetli Mh." breadcrumb-style line sahibinden
-# shows next to the price, since İl/İlçe/Mahalle aren't reliably in the spec table.
-_LOCATION_RE = re.compile(
-    r"(" + "|".join(re.escape(p) for p in sorted(set(AEGEAN_PROVINCES), key=len, reverse=True)) + r")"
-    r"\s*/\s*([^\n/,]{2,40}?)\s*/\s*([^\n/,]{2,40})"
 )
 
 # Total price is shown as "12.250.000 TL"; the per-m² price nearby ("69 TL/m²")
@@ -90,13 +79,6 @@ def _extract_price_from_text(text: str) -> float | None:
         except ValueError:
             continue
     return max(candidates) if candidates else None
-
-
-def _extract_location(text: str) -> tuple[str | None, str | None, str | None]:
-    m = _LOCATION_RE.search(text)
-    if not m:
-        return None, None, None
-    return tuple(g.strip() for g in m.groups())
 
 
 def _parse_size_m2(specs: dict, text: str) -> float | None:
@@ -163,12 +145,6 @@ def normalize(payload: dict) -> dict:
     size_m2 = _parse_size_m2(specs, full_text)
     size_donum = round(size_m2 / 1000, 3) if size_m2 else None
 
-    # The extension walks real breadcrumb links for this now, which is far
-    # more reliable than regex over flattened page text (sahibinden's "/"
-    # breadcrumb separators turned out to be CSS decoration, not real text,
-    # so the text-pattern fallback below rarely actually matches anything).
-    text_province, text_district, text_neighborhood = _extract_location(raw_text)
-
     tree_count = _extract_tree_count(specs, full_text)
     tree_age = _extract_tree_age(specs, full_text)
     tree_species = _extract_tree_species(full_text)
@@ -201,12 +177,13 @@ def normalize(payload: dict) -> dict:
     road_access = _contains_any(full_text, ROAD_ACCESS_KEYWORDS)
     electricity = _contains_any(full_text, ELECTRICITY_KEYWORDS)
 
-    district = payload.get("district") or specs.get("İlçe") or text_district
-    neighborhood = payload.get("neighborhood") or specs.get("Mahalle") or text_neighborhood
-    if (district or "").lower() in _KNOWN_PROVINCE_NAMES:
-        # A "district" that's actually a province name means the breadcrumb
-        # walker latched onto the wrong link chain — discard rather than
-        # store obviously-wrong location data.
+    province = payload.get("province") or specs.get("İl")
+    district = payload.get("district") or specs.get("İlçe")
+    neighborhood = payload.get("neighborhood") or specs.get("Mahalle")
+    if district and province and district.lower() == province.lower():
+        # Degenerate case — a district can't be the same as its own
+        # province, so the breadcrumb walker likely latched onto the
+        # wrong link chain. Discard rather than store obviously-wrong data.
         district = None
         neighborhood = None
 
@@ -217,7 +194,7 @@ def normalize(payload: dict) -> dict:
         "currency": payload.get("currency", "TRY"),
         "size_m2": size_m2,
         "size_donum": size_donum,
-        "province": payload.get("province") or specs.get("İl") or text_province,
+        "province": province,
         "district": district,
         "neighborhood": neighborhood,
         "land_type": land_type,

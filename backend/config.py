@@ -1,20 +1,10 @@
 import os
 
-AEGEAN_PROVINCES = [
-    "İzmir", "Izmir", "Manisa", "Aydın", "Aydin", "Denizli",
-    "Muğla", "Mugla", "Uşak", "Usak", "Kütahya", "Kutahya",
-    "Afyonkarahisar", "Balıkesir", "Balikesir",
-]
-
-# Turkey's other major provinces — used to sanity-check extracted district
-# names. A "district" that's actually one of these is a sign the breadcrumb
-# walker grabbed the wrong link (e.g. a "popular cities" nav list) rather
-# than the real location trail.
-OTHER_MAJOR_PROVINCES = [
-    "İstanbul", "Istanbul", "Ankara", "Adana", "Antalya", "Bursa", "Konya",
-    "Gaziantep", "Mersin", "Kayseri", "Eskişehir", "Eskisehir", "Samsun",
-    "Kocaeli", "Trabzon", "Şanlıurfa", "Sanliurfa", "Diyarbakır", "Diyarbakir",
-]
+# No hardcoded province/city list: the extension captures whatever
+# province/district/neighborhood sahibinden's own breadcrumb says (see
+# extractListingData in extension/popup.js), so any city works without
+# needing to be added here. The dashboard's province/district filter
+# dropdowns are populated dynamically from whatever's actually captured.
 
 ORCHARD_TREE_KEYWORDS = {
     "zeytin": "olive",

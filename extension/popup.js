@@ -1,12 +1,6 @@
 const BACKEND_URL = "http://localhost:5001/api/capture";
 
 function extractListingData() {
-  const AEGEAN_PROVINCES = [
-    "İzmir", "Izmir", "Manisa", "Aydın", "Aydin", "Denizli",
-    "Muğla", "Mugla", "Uşak", "Usak", "Kütahya", "Kutahya",
-    "Afyonkarahisar", "Balıkesir", "Balikesir",
-  ];
-
   const specs = {};
 
   function addSpec(label, value) {
@@ -44,28 +38,35 @@ function extractListingData() {
     if (m) priceRaw = m[1];
   }
 
-  // Location: walk breadcrumb-style links looking for a province name, then
-  // take the next couple of links as district/neighborhood. Doing this over
-  // real anchor elements (rather than regex over flattened page text) avoids
-  // depending on whether "/" separators are real text or CSS decoration.
-  //
-  // A plain "find any link matching a province name" is too loose — pages
-  // also have unrelated nav (a "popular cities" quick-links list, etc.) that
-  // can contain a province name too. Require one of the few preceding links
-  // to look like breadcrumb taxonomy (Emlak/Arsa/Satılık/...) so we don't
-  // grab the wrong "İzmir" and its unrelated neighboring link.
-  const BREADCRUMB_MARKERS = ["Emlak", "Arsa", "Satılık", "Tarla", "Kiralık", "Konut", "İşyeri", "Bağ", "Bahçe"];
-  let province = null, district = null, neighborhood = null;
+  // Location: sahibinden's breadcrumb is always
+  // "Anasayfa > Emlak > Arsa > Satılık > <province> > <district> > <neighborhood>".
+  // Rather than matching province/district names against a hardcoded city
+  // list (which just means missing whatever city we didn't think to list —
+  // e.g. Çanakkale isn't "Aegean" by strict geography but plenty of olive
+  // land is there), anchor on the taxonomy words instead: they're a small,
+  // stable set sahibinden itself defines, and whatever links immediately
+  // follow a run of them are the location trail, whatever it says.
+  const BREADCRUMB_MARKERS = new Set([
+    "Anasayfa", "Emlak", "Arsa", "Satılık", "Kiralık", "Tarla", "Konut",
+    "İşyeri", "Bağ", "Bahçe", "Devremülk", "Turistik Tesis",
+  ]);
+  const linkText = (a) => (a?.innerText || "").trim();
   const links = Array.from(document.querySelectorAll("a"));
-  for (let i = 0; i < links.length; i++) {
-    const text = links[i].innerText?.trim();
-    if (!AEGEAN_PROVINCES.includes(text)) continue;
-    const precedingTexts = links.slice(Math.max(0, i - 4), i).map((a) => a.innerText?.trim());
-    if (!precedingTexts.some((t) => BREADCRUMB_MARKERS.includes(t))) continue;
-    province = text;
-    district = links[i + 1]?.innerText?.trim() || null;
-    neighborhood = links[i + 2]?.innerText?.trim() || null;
-    break;
+
+  let bestRunEnd = -1, bestRunLen = 0;
+  for (let i = 0; i < links.length; ) {
+    if (!BREADCRUMB_MARKERS.has(linkText(links[i]))) { i++; continue; }
+    let j = i;
+    while (j < links.length && BREADCRUMB_MARKERS.has(linkText(links[j]))) j++;
+    if (j - i > bestRunLen) { bestRunLen = j - i; bestRunEnd = j; }
+    i = j;
+  }
+
+  let province = null, district = null, neighborhood = null;
+  if (bestRunLen >= 2) {
+    province = linkText(links[bestRunEnd]) || null;
+    district = linkText(links[bestRunEnd + 1]) || null;
+    neighborhood = linkText(links[bestRunEnd + 2]) || null;
   }
 
   return {
