@@ -39,11 +39,17 @@ def _turkish_lower(s: str) -> str:
     return s.replace("İ", "i").replace("I", "ı").lower()
 
 
-# Turkish attaches the formal copula suffix directly onto "var"/"mevcut"
-# ("var" + "dır" = "vardır", "mevcut" + "tur" = "mevcuttur" — same meaning,
-# more formal register, extremely common in listing text). A strict \b
-# immediately after these words would miss that continuation entirely.
-_COPULA_SUFFIXES = {"var": ("dır", "dir", "dur", "dür"), "mevcut": ("tur", "tır", "tir", "tür")}
+# Turkish is agglutinative: suffixes attach directly onto the stem with no
+# space ("var"+"dır"="vardır", "mevcut"+"tur"="mevcuttur", "tapu"+"lu"=
+# "tapulu" meaning "deeded/has a title deed" — this exact suffix is what
+# sahibinden's own "Tapu Durumu" spec field uses, e.g. "Müstakil Tapulu").
+# A strict \b immediately after these words misses the continuation
+# entirely, so give each a flexible optional suffix instead.
+_SUFFIX_FLEXIBLE_ENDINGS = {
+    "var": ("dır", "dir", "dur", "dür"),
+    "mevcut": ("tur", "tır", "tir", "tür"),
+    "tapu": ("lu", "lı", "li", "lü", "ludur", "lıdır", "lidir", "lüdür"),
+}
 
 
 def _keyword_pattern(keyword: str) -> re.Pattern:
@@ -52,9 +58,9 @@ def _keyword_pattern(keyword: str) -> re.Pattern:
     words — e.g. "erik" (plum) matched inside "içerik" (content), "bağ"
     (vineyard) matched inside "Bağlantı" (link), both from page footer
     boilerplate. \b works correctly with Turkish characters (verified).
-    Keywords ending in "var"/"mevcut" get a flexible suffix instead of a
-    strict trailing boundary — see _COPULA_SUFFIXES."""
-    for base, suffixes in _COPULA_SUFFIXES.items():
+    Keywords ending in a word from _SUFFIX_FLEXIBLE_ENDINGS get a flexible
+    suffix instead of a strict trailing boundary."""
+    for base, suffixes in _SUFFIX_FLEXIBLE_ENDINGS.items():
         if keyword.endswith(base):
             prefix = re.escape(keyword[: -len(base)])
             suffix_group = "|".join(suffixes)
@@ -161,6 +167,22 @@ def _parse_size_m2(specs: dict, text: str) -> float | None:
     return None
 
 
+# The seller's free-text description sits between an "Açıklama" heading and
+# an "Özellikler" (Features) heading in sahibinden's page text. The
+# extension's guessed CSS selector for this kept grabbing the wrong element
+# (an unrelated messaging widget) — this direct text-marker approach doesn't
+# depend on any CSS class at all.
+_DESCRIPTION_RE = re.compile(r"Açıklama\s*\n+(.*?)(?:\n+Özellikler\b|\Z)", re.DOTALL)
+
+
+def _extract_description(page_text: str) -> str | None:
+    m = _DESCRIPTION_RE.search(page_text)
+    if not m:
+        return None
+    desc = m.group(1).strip()
+    return desc or None
+
+
 def _classify_land_type(text: str, tree_count: int | None, tree_age: int | None) -> str:
     has_strong_keyword = any(_keyword_pattern(kw).search(text) for kw in STRONG_ORCHARD_KEYWORDS)
     has_any_tree_keyword = any(_keyword_pattern(kw).search(text) for kw in ORCHARD_TREE_KEYWORDS)
@@ -182,7 +204,12 @@ def _extract_tree_count(specs: dict, text: str) -> int | None:
             m = re.search(r"\d+", specs[key])
             if m:
                 return int(m.group())
-    m = re.search(r"(\d+)\s*(adet\s*)?(zeytin|meyve)\s*ağac", text)
+    # Allows a variety name between the count and the species word, e.g.
+    # "2650 adet Trilye cinsi zeytin ağacı" (Trilye is an olive cultivar) —
+    # a tight "(adet)? zeytin" adjacency requirement misses this entirely.
+    # The [^.\n\d]{0,30} window stops at sentence/line breaks or another
+    # digit, so it won't reach across into an unrelated number elsewhere.
+    m = re.search(r"(\d+)\s*(?:adet)?[^.\n\d]{0,30}?(?:zeytin|meyve)\s*ağac", text)
     return int(m.group(1)) if m else None
 
 
@@ -199,8 +226,8 @@ def _extract_tree_age(specs: dict, text: str) -> int | None:
 def normalize(payload: dict) -> dict:
     """payload comes from the extension: {url, title, price_raw, specs: {label: value}, description, page_text}"""
     specs = payload.get("specs", {}) or {}
-    description = payload.get("description", "") or ""
     page_text = payload.get("page_text", "") or ""
+    description = _extract_description(page_text) or payload.get("description", "") or ""
     raw_text = f"{description}\n{page_text}"
     full_text = _turkish_lower(raw_text)
 

@@ -23,6 +23,7 @@
   a.listing-link { color: #1a5276; text-decoration: none; }
   a.listing-link:hover { text-decoration: underline; }
   .breakdown { font-size: 0.72rem; color: #777; }
+  .desc-preview { font-size: 0.75rem; color: #555; margin-top: 0.3rem; max-width: 32ch; cursor: help; }
   .filters { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 1.2rem; }
   .filters select { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; background: white; }
   .filters a.clear { font-size: 0.8rem; color: #777; text-decoration: none; }
@@ -100,6 +101,9 @@
         <td>
           <a class="listing-link" href="{{ l.url }}" target="_blank">{{ l.title or l.url }}</a><br>
           <small>{{ l.district or '' }}{{ ', ' if l.district and l.province }}{{ l.province or '' }}</small>
+          {% if l.description %}
+          <div class="desc-preview" title="{{ l.description }}">{{ l.description|truncate(140) }}</div>
+          {% endif %}
         </td>
         <td>
           {% if l.price %}{{ '{:,.0f}'.format(l.price) }} {{ l.currency }}
