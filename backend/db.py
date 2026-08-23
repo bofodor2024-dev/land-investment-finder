@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS listings (
     electricity INTEGER DEFAULT 0,
     description TEXT,
     raw_specs_json TEXT,
+    raw_payload_json TEXT,
     status TEXT DEFAULT 'active',
     captured_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -57,6 +58,11 @@ def get_conn():
 def init_db():
     with get_conn() as conn:
         conn.executescript(SCHEMA)
+        # Migration-safe column additions for existing databases — never
+        # drops or recreates the table, so real captured data is untouched.
+        existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(listings)")}
+        if "raw_payload_json" not in existing_cols:
+            conn.execute("ALTER TABLE listings ADD COLUMN raw_payload_json TEXT")
 
 
 def upsert_listing(fields: dict) -> tuple[int, bool, bool]:
@@ -106,6 +112,12 @@ def all_listings(status: str = "active") -> list[dict]:
         rows = conn.execute(
             "SELECT * FROM listings WHERE status = ? ORDER BY captured_at DESC", (status,)
         ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def all_listings_any_status() -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT * FROM listings ORDER BY captured_at DESC").fetchall()
         return [dict(r) for r in rows]
 
 

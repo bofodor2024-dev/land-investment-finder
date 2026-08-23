@@ -1,3 +1,5 @@
+import json
+
 from flask import Flask, jsonify, render_template, request
 
 import db
@@ -26,8 +28,33 @@ def capture():
         return jsonify({"error": "missing url"}), 400
 
     fields = normalize(payload)
+    # Store the full raw payload alongside the derived fields, so scoring-logic
+    # fixes (keyword lists, parsing rules, etc.) can be re-applied to every
+    # already-captured listing later via /api/reprocess — no re-visiting and
+    # re-clicking "Capture" on every listing each time the logic improves.
+    fields["raw_payload_json"] = json.dumps(payload, ensure_ascii=False)
     listing_id, is_new, price_changed = db.upsert_listing(fields)
     return jsonify({"id": listing_id, "is_new": is_new, "price_changed": price_changed})
+
+
+@app.route("/api/reprocess", methods=["POST"])
+def reprocess():
+    """Re-run normalize() against every stored raw payload and update the
+    derived fields in place. Use this after fixing extraction/scoring logic,
+    instead of re-capturing every listing in the browser again."""
+    listings = db.all_listings_any_status()
+    updated, skipped = 0, 0
+    for listing in listings:
+        raw = listing.get("raw_payload_json")
+        if not raw:
+            skipped += 1
+            continue
+        payload = json.loads(raw)
+        fields = normalize(payload)
+        fields["raw_payload_json"] = raw
+        db.upsert_listing(fields)
+        updated += 1
+    return jsonify({"updated": updated, "skipped": skipped})
 
 
 @app.route("/api/listings")

@@ -34,6 +34,10 @@
   th small a:hover { text-decoration: underline; }
   th small a.active { color: #fff; font-weight: 600; }
   th a.active { text-decoration: underline; }
+  #recompute-btn { margin-left: auto; padding: 0.35rem 0.7rem; border: 1px solid #2f2a20; border-radius: 4px; background: #2f2a20; color: #fff; font-size: 0.8rem; cursor: pointer; }
+  #recompute-btn:hover { background: #423b2c; }
+  #recompute-btn:disabled { opacity: 0.5; cursor: default; }
+  .recompute-status { font-size: 0.78rem; color: #666; }
 </style>
 </head>
 <body>
@@ -65,6 +69,8 @@
     {% if selected_province or selected_district %}
     <a class="clear" href="/">Clear filters</a>
     {% endif %}
+    <button type="button" id="recompute-btn" onclick="recomputeAll()" title="Re-runs scoring/extraction on every captured listing using its saved raw data — no need to re-visit sahibinden.">Recompute All</button>
+    <span id="recompute-status" class="recompute-status"></span>
   </form>
   <table>
     <thead>
@@ -119,5 +125,22 @@
       {% endfor %}
     </tbody>
   </table>
+  <script>
+    async function recomputeAll() {
+      const btn = document.getElementById('recompute-btn');
+      const status = document.getElementById('recompute-status');
+      btn.disabled = true;
+      status.textContent = 'Recomputing...';
+      try {
+        const res = await fetch('/api/reprocess', { method: 'POST' });
+        const data = await res.json();
+        status.textContent = `Updated ${data.updated}` + (data.skipped ? `, skipped ${data.skipped} (captured before this feature — re-capture those once to enable it)` : '.');
+        setTimeout(() => location.reload(), 1200);
+      } catch (err) {
+        status.textContent = 'Failed: ' + err.message;
+        btn.disabled = false;
+      }
+    }
+  </script>
 </body>
 </html>
