@@ -82,12 +82,23 @@ OLIVE_YIELD_BY_AGE_KG = [
     (30, 55),    # plateau
 ]
 
-# TL per kg, wholesale raw (table) olives — NOT olive oil. There is no live
-# price source wired up here (nothing reliable to scrape, and prices move
-# fast with TL inflation), so this MUST be set manually with a current
-# number for the ROI estimate to mean anything. Left as None on purpose
-# rather than guessing a number that could go stale and mislead you.
-OLIVE_WHOLESALE_PRICE_TL_PER_KG = None
+# TL per kg, wholesale raw (table) olives — NOT olive oil. No live price
+# source is wired up (nothing reliable to scrape, and prices move fast with
+# TL inflation) — update this manually with a current number periodically.
+#
+# Current value: 150 TL/kg — the low end of a "150-400 TL/kg, green olives
+# at opening" range reported for the Manisa/Salihli market (same location
+# as a captured listing) on tarimziraat.com, dated 16 Apr 2026. That site is
+# a crowdsourced farmer/trader price board, not an official exchange, so
+# treat this as a rough starting point, not a verified benchmark.
+#
+# For comparison, Aydın Ticaret Borsası (an official, verifiable exchange)
+# recorded "Siyah Salamura Zeytin" (processed/brined, a different product
+# stage) at 34 TL/kg on 15 Dec 2025, only 200kg traded that day — too thin
+# and off-season-adjacent to use directly, but a useful sanity check.
+# Table-olive trading is seasonal (~Oct-Dec harvest); revisit this figure
+# once the new season's exchange data is flowing for something more solid.
+OLIVE_WHOLESALE_PRICE_TL_PER_KG = 150.0
 
 # Override with LAND_FINDER_DB=/path/to/other.db for testing/dev work, so
 # real captured data is never at risk of being reset or overwritten.
