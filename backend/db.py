@@ -77,6 +77,14 @@ def init_db():
         existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(listings)")}
         if "raw_payload_json" not in existing_cols:
             conn.execute("ALTER TABLE listings ADD COLUMN raw_payload_json TEXT")
+        # Separate from tree_count/tree_age_years (which normalize() derives
+        # from listing text and overwrites on every /api/reprocess run) —
+        # these hold a value YOU supply when the seller doesn't state one
+        # but it's visible in photos, and survive reprocessing untouched.
+        if "tree_count_override" not in existing_cols:
+            conn.execute("ALTER TABLE listings ADD COLUMN tree_count_override INTEGER")
+        if "tree_age_years_override" not in existing_cols:
+            conn.execute("ALTER TABLE listings ADD COLUMN tree_age_years_override INTEGER")
 
 
 def upsert_listing(fields: dict) -> tuple[int, bool, bool]:
@@ -133,6 +141,18 @@ def all_listings_any_status() -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute("SELECT * FROM listings ORDER BY captured_at DESC").fetchall()
         return [dict(r) for r in rows]
+
+
+def set_tree_overrides(listing_id: int, tree_count: int | None, tree_age_years: int | None):
+    """NULL clears an override, letting the extracted value show through
+    again. Untouched by /api/reprocess, which only sets columns derived
+    from normalize()."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE listings SET tree_count_override = ?, tree_age_years_override = ?, "
+            "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (tree_count, tree_age_years, listing_id),
+        )
 
 
 def price_history_for(listing_id: int) -> list[dict]:

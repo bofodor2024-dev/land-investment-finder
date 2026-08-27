@@ -49,6 +49,12 @@
   .settings-body input { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; width: 9rem; font-size: 0.85rem; }
   .settings-body small { color: #999; font-size: 0.7rem; }
   .settings-body button { padding: 0.4rem 0.8rem; border: 1px solid #2f2a20; border-radius: 4px; background: #2f2a20; color: #fff; font-size: 0.8rem; cursor: pointer; height: fit-content; }
+  .edit-link { font-size: 0.72rem; color: #8a6d1c; text-decoration: none; }
+  .edit-link:hover { text-decoration: underline; }
+  .manual-tag { color: #8a6d1c; font-style: italic; }
+  .tree-edit-form { margin-top: 0.3rem; display: flex; gap: 0.3rem; }
+  .tree-edit-form input { width: 4.5rem; padding: 0.2rem 0.3rem; border: 1px solid #ccc; border-radius: 3px; font-size: 0.75rem; }
+  .tree-edit-form button { padding: 0.2rem 0.5rem; border: 1px solid #2f2a20; border-radius: 3px; background: #2f2a20; color: #fff; font-size: 0.72rem; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -148,7 +154,13 @@
         <td>{{ l.size_donum ~ ' dönüm' if l.size_donum else (l.size_m2 ~ ' m²' if l.size_m2 else '—') }}</td>
         <td>
           <span class="tag {{ 'orchard' if l.land_type == 'existing_orchard' else 'raw' }}">{{ l.land_type or 'unknown' }}</span>
-          {% if l.tree_species %}<br><small>{{ l.tree_species }}{% if l.tree_count %} ({{ l.tree_count }} trees{% if l.tree_age_years %}, ~{{ l.tree_age_years }}y{% endif %}){% endif %}</small>{% endif %}
+          {% if l.tree_species %}<br><small>{{ l.tree_species }}{% if l.tree_count %} ({{ l.tree_count }} trees{% if l.tree_age_years %}, ~{{ l.tree_age_years }}y{% endif %}){% endif %}{% if l.tree_count_override is not none or l.tree_age_years_override is not none %} <span class="manual-tag">manual</span>{% endif %}</small>{% endif %}
+          <br><a href="#" class="edit-link" onclick="toggleTreeEdit({{ l.id }}); return false;">✏️ set count/age</a>
+          <div id="tree-edit-{{ l.id }}" class="tree-edit-form" style="display:none;">
+            <input type="number" min="0" id="tc-{{ l.id }}" placeholder="count" value="{{ l.tree_count_override if l.tree_count_override is not none else '' }}">
+            <input type="number" min="0" id="ta-{{ l.id }}" placeholder="age (y)" value="{{ l.tree_age_years_override if l.tree_age_years_override is not none else '' }}">
+            <button type="button" onclick="saveTreeOverride({{ l.id }})">Save</button>
+          </div>
         </td>
         <td>{{ l.irrigation }}</td>
         <td>{{ l.tapu_status }}{% if l.has_lien %} <span class="flag">⚠ lien</span>{% endif %}</td>
@@ -218,6 +230,27 @@
         setTimeout(() => location.reload(), 500);
       } catch (err) {
         status.textContent = 'Failed: ' + err.message;
+      }
+    }
+
+    function toggleTreeEdit(id) {
+      const el = document.getElementById(`tree-edit-${id}`);
+      el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    async function saveTreeOverride(id) {
+      const tc = document.getElementById(`tc-${id}`).value;
+      const ta = document.getElementById(`ta-${id}`).value;
+      try {
+        const res = await fetch(`/api/listings/${id}/tree_override`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tree_count: tc || null, tree_age_years: ta || null }),
+        });
+        if (!res.ok) throw new Error(`Server responded ${res.status}`);
+        location.reload();
+      } catch (err) {
+        alert('Failed to save: ' + err.message);
       }
     }
   </script>

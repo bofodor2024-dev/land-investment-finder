@@ -85,6 +85,19 @@ def archive_listing(listing_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/listings/<int:listing_id>/tree_override", methods=["POST"])
+def tree_override(listing_id):
+    payload = request.get_json(force=True) or {}
+
+    def parse_int(v):
+        return int(v) if v not in (None, "") else None
+
+    tree_count = parse_int(payload.get("tree_count"))
+    tree_age_years = parse_int(payload.get("tree_age_years"))
+    db.set_tree_overrides(listing_id, tree_count, tree_age_years)
+    return jsonify({"ok": True})
+
+
 def _apply_filters(scored, args):
     province = args.get("province") or ""
     district = args.get("district") or ""

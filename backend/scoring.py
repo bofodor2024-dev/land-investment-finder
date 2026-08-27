@@ -106,11 +106,25 @@ def score_listing(listing: dict, group_averages: dict, settings: dict) -> dict:
     }
 
 
+def _apply_tree_overrides(listing: dict) -> dict:
+    """tree_count_override/tree_age_years_override are set manually when a
+    listing's photos clearly show an established grove but the seller's
+    text never states a count/age. Preferred over the extracted value
+    whenever present; survive /api/reprocess untouched (see db.py)."""
+    resolved = dict(listing)
+    if listing.get("tree_count_override") is not None:
+        resolved["tree_count"] = listing["tree_count_override"]
+    if listing.get("tree_age_years_override") is not None:
+        resolved["tree_age_years"] = listing["tree_age_years_override"]
+    return resolved
+
+
 def score_all(listings: list[dict], settings: dict) -> list[dict]:
     averages = compute_group_averages(listings)
     scored = []
     for l in listings:
-        result = score_listing(l, averages, settings)
-        scored.append({**l, **result})
+        resolved = _apply_tree_overrides(l)
+        result = score_listing(resolved, averages, settings)
+        scored.append({**resolved, **result})
     scored.sort(key=lambda x: x["composite"], reverse=True)
     return scored
