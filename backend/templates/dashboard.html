@@ -43,7 +43,7 @@
   #recompute-btn:disabled { opacity: 0.5; cursor: default; }
   .recompute-status { font-size: 0.78rem; color: #666; }
   .settings-panel { margin-bottom: 1.2rem; background: white; border: 1px solid #e5e0d5; border-radius: 6px; padding: 0.5rem 0.9rem; }
-  .settings-panel summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; padding: 0.3rem 0; }
+  .settings-title { font-size: 0.85rem; font-weight: 600; padding: 0.3rem 0; }
   .settings-body { display: flex; align-items: flex-end; gap: 1.2rem; flex-wrap: wrap; padding: 0.7rem 0 0.3rem; }
   .settings-body label { display: flex; flex-direction: column; font-size: 0.75rem; color: #555; gap: 0.2rem; }
   .settings-body input { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; width: 9rem; font-size: 0.85rem; }
@@ -84,8 +84,8 @@
     <span id="recompute-status" class="recompute-status"></span>
   </form>
 
-  <details class="settings-panel">
-    <summary>ROI assumptions {% if not settings.olive_wholesale_price_try_per_kg or not settings.trees_per_donum or not settings.planting_cost_try_per_tree %}<span class="roi-hint">(incomplete — set these to see ROI estimates)</span>{% endif %}</summary>
+  <div class="settings-panel">
+    <div class="settings-title">ROI assumptions {% if not settings.olive_wholesale_price_try_per_kg or not settings.trees_per_donum or not settings.planting_cost_try_per_tree %}<span class="roi-hint">(incomplete — set these to see ROI estimates)</span>{% endif %}</div>
     <div class="settings-body">
       <label>
         Olive wholesale price
@@ -105,7 +105,7 @@
       <button type="button" onclick="saveSettings()">Save &amp; Recalculate</button>
       <span id="settings-status" class="recompute-status"></span>
     </div>
-  </details>
+  </div>
 
   <table>
     <thead>
