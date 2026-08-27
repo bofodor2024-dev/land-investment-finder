@@ -178,6 +178,8 @@
             {% if l.roi.scenario == 'if_planted' %}
               <span class="roi-scenario">if planted (~{{ l.roi.tree_count_used }} trees)</span><br>
               <small>+{{ '{:,.0f}'.format(l.roi.extra_upfront_cost_try) }} TRY planting → {{ '{:,.0f}'.format(l.roi.total_investment_try) }} TRY total</small><br>
+            {% elif l.roi.tree_count_estimated %}
+              <span class="roi-scenario">~{{ l.roi.tree_count_used }} trees (estimated from size, not stated)</span><br>
             {% endif %}
             {% if l.roi.payback_years %}
               <strong>{{ l.roi.payback_years }}y payback</strong>

@@ -90,10 +90,22 @@ def estimate_olive_roi(listing: dict, settings: dict) -> dict | None:
     if land_type == "existing_orchard" and "olive" in (listing.get("tree_species") or ""):
         tree_count = listing.get("tree_count")
         tree_age = listing.get("tree_age_years")
+        tree_count_estimated = False
+
+        # The seller often doesn't state a count, but if we know the plot
+        # size, fall back to the same density assumption used for raw-land
+        # planting projections — a rough estimate is more useful than
+        # nothing, as long as it's clearly flagged as one (not a stated
+        # number). Age has no such size-based fallback — it isn't a
+        # function of area, so that gap can only be closed by the seller's
+        # own text or your own manual override.
+        if not tree_count and size_donum and settings.get("trees_per_donum"):
+            tree_count = round(size_donum * settings["trees_per_donum"])
+            tree_count_estimated = True
+
         if not tree_count or tree_age is None:
             # Distinct from the generic "not applicable" None below — this
-            # IS an olive orchard, the listing just never states a tree
-            # count/age, so there's nothing to project from.
+            # IS an olive orchard, there's just nothing to project from yet.
             missing_fields = []
             if not tree_count:
                 missing_fields.append("tree count")
@@ -123,6 +135,7 @@ def estimate_olive_roi(listing: dict, settings: dict) -> dict | None:
             return {"missing_settings": missing}
         scenario = "if_planted"
         tree_count = round(size_donum * trees_per_donum)
+        tree_count_estimated = False  # "scenario" already conveys this is a projection
         starting_age = 0
         extra_upfront_cost = tree_count * planting_cost_per_tree
 
@@ -136,6 +149,7 @@ def estimate_olive_roi(listing: dict, settings: dict) -> dict | None:
     return {
         "scenario": scenario,
         "tree_count_used": tree_count,
+        "tree_count_estimated": tree_count_estimated,
         "extra_upfront_cost_try": round(extra_upfront_cost) if extra_upfront_cost else 0,
         "total_investment_try": round(total_investment),
         "year1_production_kg": year1_production_kg,
