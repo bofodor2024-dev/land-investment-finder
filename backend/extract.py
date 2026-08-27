@@ -210,6 +210,13 @@ def _extract_tree_count(specs: dict, text: str) -> int | None:
     # The [^.\n\d]{0,30} window stops at sentence/line breaks or another
     # digit, so it won't reach across into an unrelated number elsewhere.
     m = re.search(r"(\d+)\s*(?:adet)?[^.\n\d]{0,30}?(?:zeytin|meyve)\s*ağac", text)
+    if m:
+        return int(m.group(1))
+    # A different, very common construction: "<N> ağaçlı" (adjective,
+    # "having N trees") with the species named separately/non-adjacently,
+    # e.g. a title like "430 Agacli ... Zeytinlik" — note also the informal
+    # ASCII spelling "agacli" without ğ/ç, which real listings do use.
+    m = re.search(r"(\d+)\s*a[ğg]a[çc](?:lı|li)\b", text)
     return int(m.group(1)) if m else None
 
 

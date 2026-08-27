@@ -91,7 +91,15 @@ def estimate_olive_roi(listing: dict, settings: dict) -> dict | None:
         tree_count = listing.get("tree_count")
         tree_age = listing.get("tree_age_years")
         if not tree_count or tree_age is None:
-            return None
+            # Distinct from the generic "not applicable" None below — this
+            # IS an olive orchard, the listing just never states a tree
+            # count/age, so there's nothing to project from.
+            missing_fields = []
+            if not tree_count:
+                missing_fields.append("tree count")
+            if tree_age is None:
+                missing_fields.append("tree age")
+            return {"missing_tree_data": missing_fields}
         missing = [k for k in ("olive_wholesale_price_try_per_kg",) if not settings.get(k)]
         if missing:
             return {"missing_settings": missing}

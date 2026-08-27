@@ -160,6 +160,8 @@
             —
           {% elif l.roi.missing_settings %}
             <small class="roi-hint">Set {{ l.roi.missing_settings|join(', ') }} above</small>
+          {% elif l.roi.missing_tree_data %}
+            <small class="roi-hint">Olive grove, but no {{ l.roi.missing_tree_data|join(' / ') }} stated in listing</small>
           {% else %}
             {% if l.roi.scenario == 'if_planted' %}
               <span class="roi-scenario">if planted (~{{ l.roi.tree_count_used }} trees)</span><br>
