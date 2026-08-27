@@ -32,6 +32,17 @@ ORCHARD_TREE_KEYWORDS = {
 # the bare-fruit-name keywords above need that corroboration instead.
 STRONG_ORCHARD_KEYWORDS = {"zeytinlik", "bağ", "bahçe", "meyve bahçesi"}
 
+# Qualitative language suggesting the trees are already established and
+# bearing fruit — used ONLY as a last-resort age estimate in roi.py when no
+# number is stated anywhere (not even in the specs table). Much lower
+# confidence than a real stated age: it just means "old enough to be
+# described as productive," not any specific age. Always overridden by a
+# stated age or your own manual override when either is available.
+MATURE_TREE_LANGUAGE = [
+    "olgun", "meyveye durmuş", "meyveye oturmuş", "üretime uygun",
+    "üretim yapan", "hasada hazır", "süper verimli", "verimli zeytin",
+]
+
 IRRIGATION_POSITIVE = [
     "sulama var", "sulu tarım", "sulanabilir", "kuyu var", "kuyulu",
     "damla sulama", "artezyen", "suyu var", "su var", "suyu mevcut",

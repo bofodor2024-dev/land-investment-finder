@@ -54,6 +54,7 @@ DEFAULT_SETTINGS = {
     "olive_wholesale_price_try_per_kg": "150",
     "trees_per_donum": "25",
     "planting_cost_try_per_tree": "600",
+    "default_mature_age_years": "10",
 }
 
 

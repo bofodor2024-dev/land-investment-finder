@@ -108,6 +108,11 @@
         <input type="number" step="1" id="setting-plantcost" value="{{ settings.planting_cost_try_per_tree or '' }}">
         <small>TRY / tree, all-in</small>
       </label>
+      <label>
+        Default mature age
+        <input type="number" step="1" id="setting-matureage" value="{{ settings.default_mature_age_years or '' }}">
+        <small>years, when only "mature/productive" language is given, no number</small>
+      </label>
       <button type="button" onclick="saveSettings()">Save &amp; Recalculate</button>
       <span id="settings-status" class="recompute-status"></span>
     </div>
@@ -178,8 +183,13 @@
             {% if l.roi.scenario == 'if_planted' %}
               <span class="roi-scenario">if planted (~{{ l.roi.tree_count_used }} trees)</span><br>
               <small>+{{ '{:,.0f}'.format(l.roi.extra_upfront_cost_try) }} TRY planting → {{ '{:,.0f}'.format(l.roi.total_investment_try) }} TRY total</small><br>
-            {% elif l.roi.tree_count_estimated %}
-              <span class="roi-scenario">~{{ l.roi.tree_count_used }} trees (estimated from size, not stated)</span><br>
+            {% else %}
+              {% if l.roi.tree_count_estimated %}
+                <span class="roi-scenario">~{{ l.roi.tree_count_used }} trees (estimated from size, not stated)</span><br>
+              {% endif %}
+              {% if l.roi.tree_age_estimated %}
+                <span class="roi-scenario">~{{ l.roi.starting_age_used|int }}y (guessed from "mature/productive" language, no age stated)</span><br>
+              {% endif %}
             {% endif %}
             {% if l.roi.payback_years %}
               <strong>{{ l.roi.payback_years }}y payback</strong>
@@ -225,6 +235,7 @@
             olive_wholesale_price_try_per_kg: document.getElementById('setting-price').value || null,
             trees_per_donum: document.getElementById('setting-density').value || null,
             planting_cost_try_per_tree: document.getElementById('setting-plantcost').value || null,
+            default_mature_age_years: document.getElementById('setting-matureage').value || null,
           }),
         });
         if (!res.ok) throw new Error(`Server responded ${res.status}`);

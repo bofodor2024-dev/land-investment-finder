@@ -29,6 +29,12 @@ DEFAULT_SETTINGS), editable from the dashboard, not hardcoded here:
   at ~7,000-9,500 TL/dönüm with labor unquantified). This is a rough
   starting midpoint, not a verified figure — the settings panel exists
   specifically so you can override it with real local knowledge.
+- default_mature_age_years: seeded at 10 — used ONLY when a listing's
+  description uses qualitative "already producing" language
+  (config.MATURE_TREE_LANGUAGE — "olgun", "hasada hazır", etc.) but states
+  no actual age anywhere. This is a guess at "old enough to be described as
+  productive," not a real estimate — always overridden by a stated age or
+  your own manual tree_age_years_override when either is available.
 
 The yield-by-age curve itself (config.OLIVE_YIELD_BY_AGE_KG) stays in
 config.py since it's a more complex structure less suited to a simple
@@ -36,7 +42,8 @@ settings input.
 """
 from __future__ import annotations
 
-from config import OLIVE_YIELD_BY_AGE_KG
+from config import MATURE_TREE_LANGUAGE, OLIVE_YIELD_BY_AGE_KG
+from extract import _turkish_lower
 
 MAX_PROJECTION_YEARS = 40
 
@@ -74,6 +81,11 @@ def _project_payback_years(
     return None
 
 
+def _has_maturity_language(description: str) -> bool:
+    lowered = _turkish_lower(description or "")
+    return any(kw in lowered for kw in MATURE_TREE_LANGUAGE)
+
+
 def estimate_olive_roi(listing: dict, settings: dict) -> dict | None:
     """Returns None if there's not enough data to estimate anything for
     this listing. Returns {"missing_settings": [...]} naming which
@@ -96,12 +108,19 @@ def estimate_olive_roi(listing: dict, settings: dict) -> dict | None:
         # size, fall back to the same density assumption used for raw-land
         # planting projections — a rough estimate is more useful than
         # nothing, as long as it's clearly flagged as one (not a stated
-        # number). Age has no such size-based fallback — it isn't a
-        # function of area, so that gap can only be closed by the seller's
-        # own text or your own manual override.
+        # number).
         if not tree_count and size_donum and settings.get("trees_per_donum"):
             tree_count = round(size_donum * settings["trees_per_donum"])
             tree_count_estimated = True
+
+        # Age isn't a function of area, so it has no size-based fallback —
+        # but a description often still has a clue even without a number
+        # ("olgun", "hasada hazır", etc.). Much lower confidence than a
+        # stated number; only used as a last resort.
+        tree_age_estimated = False
+        if tree_age is None and _has_maturity_language(listing.get("description")):
+            tree_age = settings.get("default_mature_age_years")
+            tree_age_estimated = tree_age is not None
 
         if not tree_count or tree_age is None:
             # Distinct from the generic "not applicable" None below — this
@@ -136,6 +155,7 @@ def estimate_olive_roi(listing: dict, settings: dict) -> dict | None:
         scenario = "if_planted"
         tree_count = round(size_donum * trees_per_donum)
         tree_count_estimated = False  # "scenario" already conveys this is a projection
+        tree_age_estimated = False    # starting_age is always 0 here, nothing to flag
         starting_age = 0
         extra_upfront_cost = tree_count * planting_cost_per_tree
 
@@ -150,6 +170,8 @@ def estimate_olive_roi(listing: dict, settings: dict) -> dict | None:
         "scenario": scenario,
         "tree_count_used": tree_count,
         "tree_count_estimated": tree_count_estimated,
+        "starting_age_used": starting_age,
+        "tree_age_estimated": tree_age_estimated,
         "extra_upfront_cost_try": round(extra_upfront_cost) if extra_upfront_cost else 0,
         "total_investment_try": round(total_investment),
         "year1_production_kg": year1_production_kg,

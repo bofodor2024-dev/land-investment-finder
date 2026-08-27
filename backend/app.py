@@ -72,7 +72,10 @@ def settings():
 
     payload = request.get_json(force=True) or {}
     updates = {}
-    for key in ("olive_wholesale_price_try_per_kg", "trees_per_donum", "planting_cost_try_per_tree"):
+    for key in (
+        "olive_wholesale_price_try_per_kg", "trees_per_donum",
+        "planting_cost_try_per_tree", "default_mature_age_years",
+    ):
         if key in payload:
             updates[key] = payload[key]
     db.set_settings(updates)
