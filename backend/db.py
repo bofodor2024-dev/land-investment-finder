@@ -40,7 +40,21 @@ CREATE TABLE IF NOT EXISTS price_history (
     price REAL NOT NULL,
     captured_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
 """
+
+# Seeded on first use only — never overwrites a value you've already set.
+# These are rough starting points from web research (see roi.py), not
+# verified benchmarks; edit them in the dashboard settings panel any time.
+DEFAULT_SETTINGS = {
+    "olive_wholesale_price_try_per_kg": "150",
+    "trees_per_donum": "25",
+    "planting_cost_try_per_tree": "600",
+}
 
 
 @contextmanager
@@ -136,3 +150,34 @@ def set_status(listing_id: int, status: str):
             "UPDATE listings SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (status, listing_id),
         )
+
+
+def get_settings() -> dict:
+    """Returns settings as floats (or None if a value is blank), seeding any
+    missing keys with DEFAULT_SETTINGS on first call so the ROI feature works
+    out of the box while staying fully editable from the dashboard."""
+    with get_conn() as conn:
+        rows = conn.execute("SELECT key, value FROM settings").fetchall()
+        current = {r["key"]: r["value"] for r in rows}
+        missing = {k: v for k, v in DEFAULT_SETTINGS.items() if k not in current}
+        for k, v in missing.items():
+            conn.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (k, v))
+        current.update(missing)
+
+    result = {}
+    for k, v in current.items():
+        try:
+            result[k] = float(v) if v not in (None, "") else None
+        except ValueError:
+            result[k] = None
+    return result
+
+
+def set_settings(updates: dict):
+    with get_conn() as conn:
+        for k, v in updates.items():
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (k, str(v) if v is not None else None),
+            )

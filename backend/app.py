@@ -60,9 +60,23 @@ def reprocess():
 @app.route("/api/listings")
 def api_listings():
     listings = db.all_listings()
-    scored = score_all(listings)
+    scored = score_all(listings, db.get_settings())
     scored = _apply_filters(scored, request.args)
     return jsonify(scored)
+
+
+@app.route("/api/settings", methods=["GET", "POST"])
+def settings():
+    if request.method == "GET":
+        return jsonify(db.get_settings())
+
+    payload = request.get_json(force=True) or {}
+    updates = {}
+    for key in ("olive_wholesale_price_try_per_kg", "trees_per_donum", "planting_cost_try_per_tree"):
+        if key in payload:
+            updates[key] = payload[key]
+    db.set_settings(updates)
+    return jsonify(db.get_settings())
 
 
 @app.route("/api/listings/<int:listing_id>/archive", methods=["POST"])
@@ -106,7 +120,7 @@ def _apply_sort(scored, args):
 @app.route("/")
 def dashboard():
     listings = db.all_listings()
-    scored = score_all(listings)  # scored against the full captured set, before filtering
+    scored = score_all(listings, db.get_settings())  # scored against the full captured set, before filtering
 
     provinces = sorted({l["province"] for l in scored if l.get("province")})
 
@@ -131,6 +145,7 @@ def dashboard():
         selected_district=selected_district,
         selected_sort=selected_sort,
         selected_dir=selected_dir,
+        settings=db.get_settings(),
     )
 
 

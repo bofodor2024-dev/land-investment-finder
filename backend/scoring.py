@@ -19,7 +19,7 @@ def compute_group_averages(listings: list[dict]) -> dict:
     return {k: mean(v) for k, v in groups.items() if v}
 
 
-def score_listing(listing: dict, group_averages: dict) -> dict:
+def score_listing(listing: dict, group_averages: dict, settings: dict) -> dict:
     breakdown = {}
     red_flags = []
 
@@ -102,15 +102,15 @@ def score_listing(listing: dict, group_averages: dict) -> dict:
         "breakdown": breakdown,
         "red_flags": red_flags,
         "price_per_donum": round(price_per_donum, 1) if price_per_donum is not None else None,
-        "roi": estimate_olive_roi(listing),
+        "roi": estimate_olive_roi(listing, settings),
     }
 
 
-def score_all(listings: list[dict]) -> list[dict]:
+def score_all(listings: list[dict], settings: dict) -> list[dict]:
     averages = compute_group_averages(listings)
     scored = []
     for l in listings:
-        result = score_listing(l, averages)
+        result = score_listing(l, averages, settings)
         scored.append({**l, **result})
     scored.sort(key=lambda x: x["composite"], reverse=True)
     return scored

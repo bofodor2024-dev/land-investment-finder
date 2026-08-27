@@ -26,6 +26,7 @@
   .desc-preview { font-size: 0.75rem; color: #555; margin-top: 0.3rem; max-width: 32ch; cursor: help; }
   .roi-cell { font-size: 0.8rem; white-space: nowrap; }
   .roi-hint { color: #a67c00; font-style: italic; }
+  .roi-scenario { color: #8a6d1c; font-size: 0.75rem; }
   .filters { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 1.2rem; }
   .filters select { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; background: white; }
   .filters a.clear { font-size: 0.8rem; color: #777; text-decoration: none; }
@@ -41,6 +42,13 @@
   #recompute-btn:hover { background: #423b2c; }
   #recompute-btn:disabled { opacity: 0.5; cursor: default; }
   .recompute-status { font-size: 0.78rem; color: #666; }
+  .settings-panel { margin-bottom: 1.2rem; background: white; border: 1px solid #e5e0d5; border-radius: 6px; padding: 0.5rem 0.9rem; }
+  .settings-panel summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; padding: 0.3rem 0; }
+  .settings-body { display: flex; align-items: flex-end; gap: 1.2rem; flex-wrap: wrap; padding: 0.7rem 0 0.3rem; }
+  .settings-body label { display: flex; flex-direction: column; font-size: 0.75rem; color: #555; gap: 0.2rem; }
+  .settings-body input { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; width: 9rem; font-size: 0.85rem; }
+  .settings-body small { color: #999; font-size: 0.7rem; }
+  .settings-body button { padding: 0.4rem 0.8rem; border: 1px solid #2f2a20; border-radius: 4px; background: #2f2a20; color: #fff; font-size: 0.8rem; cursor: pointer; height: fit-content; }
 </style>
 </head>
 <body>
@@ -75,6 +83,30 @@
     <button type="button" id="recompute-btn" onclick="recomputeAll()" title="Re-runs scoring/extraction on every captured listing using its saved raw data — no need to re-visit sahibinden.">Recompute All</button>
     <span id="recompute-status" class="recompute-status"></span>
   </form>
+
+  <details class="settings-panel">
+    <summary>ROI assumptions {% if not settings.olive_wholesale_price_try_per_kg or not settings.trees_per_donum or not settings.planting_cost_try_per_tree %}<span class="roi-hint">(incomplete — set these to see ROI estimates)</span>{% endif %}</summary>
+    <div class="settings-body">
+      <label>
+        Olive wholesale price
+        <input type="number" step="0.01" id="setting-price" value="{{ settings.olive_wholesale_price_try_per_kg or '' }}">
+        <small>TRY / kg</small>
+      </label>
+      <label>
+        Planting density
+        <input type="number" step="1" id="setting-density" value="{{ settings.trees_per_donum or '' }}">
+        <small>trees / dönüm</small>
+      </label>
+      <label>
+        Planting cost
+        <input type="number" step="1" id="setting-plantcost" value="{{ settings.planting_cost_try_per_tree or '' }}">
+        <small>TRY / tree, all-in</small>
+      </label>
+      <button type="button" onclick="saveSettings()">Save &amp; Recalculate</button>
+      <span id="settings-status" class="recompute-status"></span>
+    </div>
+  </details>
+
   <table>
     <thead>
       <tr>
@@ -126,11 +158,18 @@
         <td class="roi-cell">
           {% if l.roi is none %}
             —
-          {% elif l.roi.missing_price %}
-            <small class="roi-hint">Set OLIVE_WHOLESALE_PRICE_TL_PER_KG in config.py</small>
+          {% elif l.roi.missing_settings %}
+            <small class="roi-hint">Set {{ l.roi.missing_settings|join(', ') }} above</small>
           {% else %}
-            ~{{ '{:,.0f}'.format(l.roi.annual_production_kg) }} kg/yr
-            <br><small>~{{ '{:,.0f}'.format(l.roi.annual_revenue_try) }} TRY/yr gross · {{ l.roi.gross_yield_pct }}% yield{% if l.roi.simple_payback_years %} · {{ l.roi.simple_payback_years }}y payback{% endif %}</small>
+            {% if l.roi.scenario == 'if_planted' %}
+              <span class="roi-scenario">if planted (~{{ l.roi.tree_count_used }} trees)</span><br>
+              <small>+{{ '{:,.0f}'.format(l.roi.extra_upfront_cost_try) }} TRY planting → {{ '{:,.0f}'.format(l.roi.total_investment_try) }} TRY total</small><br>
+            {% endif %}
+            {% if l.roi.payback_years %}
+              <strong>{{ l.roi.payback_years }}y payback</strong>
+            {% else %}
+              <span class="roi-hint">&gt;{{ 40 }}y (doesn't pay back)</span>
+            {% endif %}
           {% endif %}
         </td>
         <td class="breakdown">
@@ -156,6 +195,27 @@
       } catch (err) {
         status.textContent = 'Failed: ' + err.message;
         btn.disabled = false;
+      }
+    }
+
+    async function saveSettings() {
+      const status = document.getElementById('settings-status');
+      status.textContent = 'Saving...';
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            olive_wholesale_price_try_per_kg: document.getElementById('setting-price').value || null,
+            trees_per_donum: document.getElementById('setting-density').value || null,
+            planting_cost_try_per_tree: document.getElementById('setting-plantcost').value || null,
+          }),
+        });
+        if (!res.ok) throw new Error(`Server responded ${res.status}`);
+        status.textContent = 'Saved — reloading...';
+        setTimeout(() => location.reload(), 500);
+      } catch (err) {
+        status.textContent = 'Failed: ' + err.message;
       }
     }
   </script>
