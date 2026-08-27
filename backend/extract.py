@@ -135,18 +135,31 @@ def _parse_price(raw) -> float | None:
         return None
 
 
+MIN_PLAUSIBLE_PRICE = 100_000  # TL — real listings here are always in the millions
+
 def _extract_price_from_text(text: str) -> float | None:
-    """Total listing price, picked as the largest properly-thousands-separated
-    'X.XXX TL' amount on the page. Preferred over the element-selector guess
+    """Total listing price. Preferred over the element-selector guess
     because sahibinden also shows a much smaller per-m² price nearby, and
-    which CSS class holds which figure isn't something we could verify."""
-    candidates = []
+    which CSS class holds which figure isn't something we could verify.
+
+    Takes the FIRST plausible ("X.XXX.XXX TL" formatted, >= MIN_PLAUSIBLE_PRICE)
+    amount on the page, not the largest. A real listing had an "agency's
+    other listings" sidebar widget further down the page containing a
+    LARGER price than the listing's own — picking the max grabbed that
+    instead. First-plausible isn't foolproof either on its own: another
+    real listing's own TITLE contained a small decoy number ("... 8.800 TL
+    ...", an apparent seller typo/shorthand, ahead of the real price in
+    page order) — the >= MIN_PLAUSIBLE_PRICE filter excludes that kind of
+    small figure before "first" is applied. Verified against 4 real
+    captures, including both of these specific failure cases."""
     for m in _PRICE_TL_RE.finditer(text):
         try:
-            candidates.append(float(m.group(1).replace(".", "")))
+            value = float(m.group(1).replace(".", ""))
         except ValueError:
             continue
-    return max(candidates) if candidates else None
+        if value >= MIN_PLAUSIBLE_PRICE:
+            return value
+    return None
 
 
 def _parse_size_m2(specs: dict, text: str) -> float | None:
