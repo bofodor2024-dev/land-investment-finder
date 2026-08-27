@@ -56,6 +56,12 @@ SCORE_WEIGHTS = {
     "access": 0.10,
 }
 
+# No title deed record or a lien/mortgage are legal dealbreakers, not just
+# "less attractive" factors — cap the composite score hard regardless of how
+# good everything else looks, rather than letting them just be one weighted
+# input among five (which let a listing with no title deed still land at 55).
+TAPU_HARD_CAP = 25.0
+
 # Override with LAND_FINDER_DB=/path/to/other.db for testing/dev work, so
 # real captured data is never at risk of being reset or overwritten.
 DB_PATH = os.environ.get("LAND_FINDER_DB", "land_finder.db")

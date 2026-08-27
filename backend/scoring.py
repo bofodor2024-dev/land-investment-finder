@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from statistics import mean
 
-from config import SCORE_WEIGHTS
+from config import SCORE_WEIGHTS, TAPU_HARD_CAP
 
 
 def _group_key(listing: dict) -> tuple:
@@ -88,6 +88,13 @@ def score_listing(listing: dict, group_averages: dict) -> dict:
     breakdown["access"] = round(min(100.0, access_score), 1)
 
     composite = sum(breakdown[k] * SCORE_WEIGHTS[k] for k in SCORE_WEIGHTS)
+
+    if (tapu == "none" or listing.get("has_lien")) and composite > TAPU_HARD_CAP:
+        red_flags.append(
+            f"Score capped at {TAPU_HARD_CAP:.0f} due to serious tapu/legal "
+            f"risk (would otherwise be {composite:.1f})"
+        )
+        composite = TAPU_HARD_CAP
 
     return {
         "composite": round(composite, 1),
