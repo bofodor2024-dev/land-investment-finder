@@ -24,6 +24,8 @@
   a.listing-link:hover { text-decoration: underline; }
   .breakdown { font-size: 0.72rem; color: #777; }
   .desc-preview { font-size: 0.75rem; color: #555; margin-top: 0.3rem; max-width: 32ch; cursor: help; }
+  .roi-cell { font-size: 0.8rem; white-space: nowrap; }
+  .roi-hint { color: #a67c00; font-style: italic; }
   .filters { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 1.2rem; }
   .filters select { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; background: white; }
   .filters a.clear { font-size: 0.8rem; color: #777; text-decoration: none; }
@@ -87,6 +89,7 @@
         <th>Irrigation</th>
         <th>Tapu</th>
         <th>Flags</th>
+        <th title="Rough gross production estimate for olive groves. No operating costs netted out — see README for assumptions.">Est. Olive ROI</th>
         <th>Breakdown</th>
       </tr>
     </thead>
@@ -120,12 +123,22 @@
         <td>
           {% for f in l.red_flags %}<span class="flag">⚠ {{ f }}</span>{% endfor %}
         </td>
+        <td class="roi-cell">
+          {% if l.roi is none %}
+            —
+          {% elif l.roi.missing_price %}
+            <small class="roi-hint">Set OLIVE_WHOLESALE_PRICE_TL_PER_KG in config.py</small>
+          {% else %}
+            ~{{ '{:,.0f}'.format(l.roi.annual_production_kg) }} kg/yr
+            <br><small>~{{ '{:,.0f}'.format(l.roi.annual_revenue_try) }} TRY/yr gross · {{ l.roi.gross_yield_pct }}% yield{% if l.roi.simple_payback_years %} · {{ l.roi.simple_payback_years }}y payback{% endif %}</small>
+          {% endif %}
+        </td>
         <td class="breakdown">
           value {{ l.breakdown.value }} · maturity {{ l.breakdown.maturity }} · irr {{ l.breakdown.irrigation }} · tapu {{ l.breakdown.tapu }} · access {{ l.breakdown.access }}
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="9">No listings captured yet. Browse a listing on sahibinden.com and click "Capture Listing" in the extension.</td></tr>
+      <tr><td colspan="10">No listings captured yet. Browse a listing on sahibinden.com and click "Capture Listing" in the extension.</td></tr>
       {% endfor %}
     </tbody>
   </table>

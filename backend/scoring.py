@@ -3,6 +3,7 @@ from __future__ import annotations
 from statistics import mean
 
 from config import SCORE_WEIGHTS, TAPU_HARD_CAP
+from roi import estimate_olive_roi
 
 
 def _group_key(listing: dict) -> tuple:
@@ -101,6 +102,7 @@ def score_listing(listing: dict, group_averages: dict) -> dict:
         "breakdown": breakdown,
         "red_flags": red_flags,
         "price_per_donum": round(price_per_donum, 1) if price_per_donum is not None else None,
+        "roi": estimate_olive_roi(listing),
     }
 
 

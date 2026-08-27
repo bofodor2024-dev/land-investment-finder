@@ -62,6 +62,33 @@ SCORE_WEIGHTS = {
 # input among five (which let a listing with no title deed still land at 55).
 TAPU_HARD_CAP = 25.0
 
+# --- Olive production estimate (gross only, no operating costs netted out) ---
+#
+# Rough fruit yield by tree age, in kg/tree/year. Linearly interpolated
+# between points, plateaus after the last one. This is a GENERAL Aegean
+# semi-intensive-grove approximation, not sourced from any specific
+# regional/cultivar dataset — actual yield varies hugely by variety,
+# irrigation, care, and microclimate. It's meant for comparing listings
+# against each other, not as a forecast. Tune freely as you learn more.
+OLIVE_YIELD_BY_AGE_KG = [
+    (0, 0),      # not yet bearing
+    (3, 0),
+    (4, 5),      # coming into bearing
+    (6, 15),
+    (8, 25),
+    (10, 35),
+    (15, 45),
+    (20, 55),    # approaching/at full maturity
+    (30, 55),    # plateau
+]
+
+# TL per kg, wholesale raw (table) olives — NOT olive oil. There is no live
+# price source wired up here (nothing reliable to scrape, and prices move
+# fast with TL inflation), so this MUST be set manually with a current
+# number for the ROI estimate to mean anything. Left as None on purpose
+# rather than guessing a number that could go stale and mislead you.
+OLIVE_WHOLESALE_PRICE_TL_PER_KG = None
+
 # Override with LAND_FINDER_DB=/path/to/other.db for testing/dev work, so
 # real captured data is never at risk of being reset or overwritten.
 DB_PATH = os.environ.get("LAND_FINDER_DB", "land_finder.db")
