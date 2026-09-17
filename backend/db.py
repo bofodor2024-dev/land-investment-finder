@@ -88,6 +88,8 @@ def init_db():
             conn.execute("ALTER TABLE listings ADD COLUMN tree_age_years_override INTEGER")
         if "size_note" not in existing_cols:
             conn.execute("ALTER TABLE listings ADD COLUMN size_note TEXT")
+        if "size_donum_override" not in existing_cols:
+            conn.execute("ALTER TABLE listings ADD COLUMN size_donum_override REAL")
 
 
 def upsert_listing(fields: dict, track_price_history: bool = True) -> tuple[int, bool, bool]:
@@ -180,6 +182,19 @@ def set_tree_overrides(listing_id: int, tree_count: int | None, tree_age_years: 
             "UPDATE listings SET tree_count_override = ?, tree_age_years_override = ?, "
             "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (tree_count, tree_age_years, listing_id),
+        )
+
+
+def set_size_override(listing_id: int, size_donum: float | None):
+    """For when the seller's own listing has a clearly-wrong size (e.g. a
+    spec table reading "m²: 55" when the real parcel is obviously more like
+    55 dönüm) and there's no title-stated size to auto-prefer either — you
+    supply the real figure directly. NULL clears it. Untouched by
+    /api/reprocess, same as tree_count_override/tree_age_years_override."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE listings SET size_donum_override = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (size_donum, listing_id),
         )
 
 

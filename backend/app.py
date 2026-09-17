@@ -155,6 +155,15 @@ def tree_override(listing_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/listings/<int:listing_id>/size_override", methods=["POST"])
+def size_override(listing_id):
+    payload = request.get_json(force=True) or {}
+    raw = payload.get("size_donum")
+    size_donum = float(raw) if raw not in (None, "") else None
+    db.set_size_override(listing_id, size_donum)
+    return jsonify({"ok": True})
+
+
 def _apply_filters(scored, args):
     province = args.get("province") or ""
     district = args.get("district") or ""

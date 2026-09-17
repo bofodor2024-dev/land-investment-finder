@@ -164,11 +164,29 @@ def _apply_tree_overrides(listing: dict) -> dict:
     return resolved
 
 
+def _apply_size_override(listing: dict) -> dict:
+    """size_donum_override is set manually when the seller's own spec table
+    has an obviously-wrong size (e.g. "m²: 55" for what's clearly a
+    dönüm-scale parcel) and there's no title-stated size for normalize()'s
+    title-preference logic to fall back on either. Preferred over the
+    extracted value whenever present; survives /api/reprocess untouched."""
+    resolved = dict(listing)
+    if listing.get("size_donum_override") is not None:
+        resolved["size_donum"] = listing["size_donum_override"]
+        resolved["size_m2"] = listing["size_donum_override"] * 1000
+    return resolved
+
+
 def score_all(listings: list[dict], settings: dict) -> list[dict]:
-    averages = compute_group_averages(listings)
+    # Apply overrides before computing group averages — a size correction
+    # should also fix how this listing affects OTHER listings' comparisons,
+    # not just its own score (this is exactly what motivated
+    # MAX_PLAUSIBLE_PRICE_PER_DONUM: a wrong size otherwise corrupts the
+    # whole group, and a corrected one should let it participate normally).
+    resolved_listings = [_apply_size_override(_apply_tree_overrides(l)) for l in listings]
+    averages = compute_group_averages(resolved_listings)
     scored = []
-    for l in listings:
-        resolved = _apply_tree_overrides(l)
+    for resolved in resolved_listings:
         result = score_listing(resolved, averages, settings)
         scored.append({**resolved, **result})
     scored.sort(key=lambda x: x["composite"], reverse=True)
