@@ -61,9 +61,29 @@ def reprocess():
     return jsonify({"updated": updated, "skipped": skipped})
 
 
+def _attach_price_history(listings):
+    """Adds price_history (full list), first_price, and price_change_pct to
+    each listing — the price_history table already records a new entry
+    every time a recapture sees a different price, this just surfaces it."""
+    history_by_id = db.all_price_history()
+    for l in listings:
+        history = history_by_id.get(l["id"], [])
+        l["price_history"] = history
+        if len(history) >= 2 and history[0]["price"]:
+            first_price = history[0]["price"]
+            current_price = history[-1]["price"]
+            l["first_price"] = first_price
+            l["price_change_pct"] = round((current_price - first_price) / first_price * 100, 1)
+        else:
+            l["first_price"] = None
+            l["price_change_pct"] = None
+    return listings
+
+
 @app.route("/api/listings")
 def api_listings():
     listings = db.all_listings()
+    listings = _attach_price_history(listings)
     scored = score_all(listings, db.get_settings())
     scored = _apply_filters(scored, request.args)
     return jsonify(scored)
@@ -155,6 +175,7 @@ def _apply_sort(scored, args):
 @app.route("/")
 def dashboard():
     listings = db.all_listings()
+    listings = _attach_price_history(listings)
     scored = score_all(listings, db.get_settings())  # scored against the full captured set, before filtering
 
     provinces = sorted({l["province"] for l in scored if l.get("province")})

@@ -27,6 +27,10 @@
   .roi-cell { font-size: 0.8rem; white-space: nowrap; }
   .roi-hint { color: #a67c00; font-style: italic; }
   .roi-scenario { color: #8a6d1c; font-size: 0.75rem; }
+  .price-drop { color: #1a7a3c; font-size: 0.75rem; font-weight: 600; }
+  .price-up { color: #b3392a; font-size: 0.75rem; font-weight: 600; }
+  .price-flat { color: #999; font-size: 0.75rem; }
+  .price-history-list { margin-top: 0.3rem; padding: 0.3rem 0.5rem; background: #faf8f2; border-radius: 4px; font-size: 0.72rem; color: #555; }
   .filters { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 1.2rem; }
   .filters select { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; background: white; }
   .filters a.clear { font-size: 0.8rem; color: #777; text-decoration: none; }
@@ -159,6 +163,24 @@
         <td>
           {% if l.price %}{{ '{:,.0f}'.format(l.price) }} {{ l.currency }}
             {% if l.size_donum %}<br><small>{{ '{:,.0f}'.format(l.price / l.size_donum) }} / dönüm</small>{% endif %}
+            {% if l.price_change_pct is not none %}
+              <br>
+              {% if l.price_change_pct < 0 %}
+                <span class="price-drop">↓ {{ l.price_change_pct|abs }}% since first seen</span>
+              {% elif l.price_change_pct > 0 %}
+                <span class="price-up">↑ {{ l.price_change_pct }}% since first seen</span>
+              {% else %}
+                <span class="price-flat">unchanged since first seen</span>
+              {% endif %}
+            {% endif %}
+            {% if l.price_history|length > 1 %}
+              <br><a href="#" class="edit-link" onclick="togglePriceHistory({{ l.id }}); return false;">📈 {{ l.price_history|length }} price points</a>
+              <div id="price-history-{{ l.id }}" class="price-history-list" style="display:none;">
+                {% for h in l.price_history %}
+                <div>{{ h.captured_at[:10] }}: {{ '{:,.0f}'.format(h.price) }} {{ l.currency }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
           {% else %}—{% endif %}
         </td>
         <td>{{ l.size_donum ~ ' dönüm' if l.size_donum else (l.size_m2 ~ ' m²' if l.size_m2 else '—') }}</td>
@@ -286,6 +308,11 @@
     function toggleTreeEdit(id) {
       const el = document.getElementById(`tree-edit-${id}`);
       el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    function togglePriceHistory(id) {
+      const el = document.getElementById(`price-history-${id}`);
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
 
     async function saveTreeOverride(id) {

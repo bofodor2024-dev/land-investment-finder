@@ -165,6 +165,19 @@ def price_history_for(listing_id: int) -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def all_price_history() -> dict[int, list[dict]]:
+    """One query for every listing's price history, grouped by listing_id —
+    avoids an N+1 query per listing when rendering the dashboard."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT listing_id, price, captured_at FROM price_history ORDER BY listing_id, captured_at"
+        ).fetchall()
+    grouped: dict[int, list[dict]] = {}
+    for r in rows:
+        grouped.setdefault(r["listing_id"], []).append({"price": r["price"], "captured_at": r["captured_at"]})
+    return grouped
+
+
 def set_status(listing_id: int, status: str):
     with get_conn() as conn:
         conn.execute(
