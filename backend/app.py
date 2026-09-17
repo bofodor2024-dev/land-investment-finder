@@ -56,15 +56,19 @@ def reprocess():
         payload = json.loads(raw)
         fields = normalize(payload)
         fields["raw_payload_json"] = raw
-        db.upsert_listing(fields)
+        # track_price_history=False: re-deriving from the same raw payload,
+        # so any price difference is a parsing correction, not a real
+        # market event — see db.upsert_listing's docstring.
+        db.upsert_listing(fields, track_price_history=False)
         updated += 1
     return jsonify({"updated": updated, "skipped": skipped})
 
 
 def _attach_price_history(listings):
-    """Adds price_history (full list), first_price, and price_change_pct to
-    each listing — the price_history table already records a new entry
-    every time a recapture sees a different price, this just surfaces it."""
+    """Adds price_history (full list), first_price, price_change_pct, and
+    last_price_change_at to each listing — the price_history table already
+    records a new entry every time a recapture sees a different price, this
+    just surfaces it."""
     history_by_id = db.all_price_history()
     for l in listings:
         history = history_by_id.get(l["id"], [])
@@ -74,10 +78,21 @@ def _attach_price_history(listings):
             current_price = history[-1]["price"]
             l["first_price"] = first_price
             l["price_change_pct"] = round((current_price - first_price) / first_price * 100, 1)
+            l["last_price_change_at"] = history[-1]["captured_at"]
         else:
             l["first_price"] = None
             l["price_change_pct"] = None
+            l["last_price_change_at"] = None
     return listings
+
+
+def _top_price_drops(scored, limit=5):
+    """Listings with a net price decrease, most recent change first — a
+    fresh drop is a stronger negotiation signal than an old one. Doesn't
+    reorder the main table; this is a separate highlight only."""
+    drops = [l for l in scored if l.get("price_change_pct") is not None and l["price_change_pct"] < 0]
+    drops.sort(key=lambda l: l["last_price_change_at"], reverse=True)
+    return drops[:limit]
 
 
 @app.route("/api/listings")
@@ -202,6 +217,7 @@ def dashboard():
         selected_sort=selected_sort,
         selected_dir=selected_dir,
         settings=db.get_settings(),
+        price_drops=_top_price_drops(scored),
     )
 
 

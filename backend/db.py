@@ -88,8 +88,17 @@ def init_db():
             conn.execute("ALTER TABLE listings ADD COLUMN tree_age_years_override INTEGER")
 
 
-def upsert_listing(fields: dict) -> tuple[int, bool, bool]:
+def upsert_listing(fields: dict, track_price_history: bool = True) -> tuple[int, bool, bool]:
     """Insert or update a listing by URL.
+
+    track_price_history=False is for /api/reprocess: re-deriving fields from
+    the SAME stored raw payload (e.g. after fixing a parsing bug) can change
+    `price` without the seller having touched anything — that's a
+    correction to a past mistake, not a real price-history event. When
+    False and the price differs, the most recent price_history row is
+    corrected in place instead of a fake "change" being logged (this bit
+    us once: a price-extraction bug fix logged an 80%-drop that was really
+    just the wrong number being replaced with the right one).
 
     Returns (listing_id, is_new, price_changed).
     """
@@ -122,12 +131,28 @@ def upsert_listing(fields: dict) -> tuple[int, bool, bool]:
         )
 
         if price_changed:
-            conn.execute(
-                "INSERT INTO price_history (listing_id, price) VALUES (?, ?)",
-                (listing_id, fields.get("price")),
-            )
+            if track_price_history:
+                conn.execute(
+                    "INSERT INTO price_history (listing_id, price) VALUES (?, ?)",
+                    (listing_id, fields.get("price")),
+                )
+            else:
+                # captured_at has only second resolution — id DESC as a
+                # tiebreaker ensures the truly-latest row is picked even
+                # when two entries land in the same second.
+                latest = conn.execute(
+                    "SELECT id FROM price_history WHERE listing_id = ? ORDER BY captured_at DESC, id DESC LIMIT 1",
+                    (listing_id,),
+                ).fetchone()
+                if latest:
+                    conn.execute("UPDATE price_history SET price = ? WHERE id = ?", (fields.get("price"), latest["id"]))
+                else:
+                    conn.execute(
+                        "INSERT INTO price_history (listing_id, price) VALUES (?, ?)",
+                        (listing_id, fields.get("price")),
+                    )
 
-        return listing_id, False, price_changed
+        return listing_id, False, (price_changed if track_price_history else False)
 
 
 def all_listings(status: str = "active") -> list[dict]:
@@ -159,7 +184,10 @@ def set_tree_overrides(listing_id: int, tree_count: int | None, tree_age_years: 
 def price_history_for(listing_id: int) -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT price, captured_at FROM price_history WHERE listing_id = ? ORDER BY captured_at",
+            # id as a tiebreaker: captured_at only has second resolution,
+            # so two entries in the same second need it to stay in true
+            # insertion order.
+            "SELECT price, captured_at FROM price_history WHERE listing_id = ? ORDER BY captured_at, id",
             (listing_id,),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -170,7 +198,7 @@ def all_price_history() -> dict[int, list[dict]]:
     avoids an N+1 query per listing when rendering the dashboard."""
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT listing_id, price, captured_at FROM price_history ORDER BY listing_id, captured_at"
+            "SELECT listing_id, price, captured_at FROM price_history ORDER BY listing_id, captured_at, id"
         ).fetchall()
     grouped: dict[int, list[dict]] = {}
     for r in rows:

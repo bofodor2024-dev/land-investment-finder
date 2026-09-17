@@ -31,6 +31,13 @@
   .price-up { color: #b3392a; font-size: 0.75rem; font-weight: 600; }
   .price-flat { color: #999; font-size: 0.75rem; }
   .price-history-list { margin-top: 0.3rem; padding: 0.3rem 0.5rem; background: #faf8f2; border-radius: 4px; font-size: 0.72rem; color: #555; }
+  .price-drops-panel { margin-bottom: 1.2rem; background: #fffaf0; border: 1px solid #e8d9a8; border-radius: 6px; padding: 0.5rem 0.9rem 0.9rem; }
+  .price-drops-list { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: 0.5rem; }
+  .price-drop-item { display: flex; flex-direction: column; gap: 0.15rem; width: 15rem; padding: 0.5rem 0.7rem; background: white; border: 1px solid #eee; border-radius: 5px; text-decoration: none; }
+  .price-drop-item:hover { border-color: #d8c58a; }
+  .pd-title { font-size: 0.78rem; color: #1a5276; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pd-loc { font-size: 0.7rem; color: #888; }
+  .pd-detail { font-size: 0.7rem; color: #666; }
   .filters { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 1.2rem; }
   .filters select { padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; background: white; }
   .filters a.clear { font-size: 0.8rem; color: #777; text-decoration: none; }
@@ -126,6 +133,22 @@
       <span id="settings-status" class="recompute-status"></span>
     </div>
   </div>
+
+  {% if price_drops %}
+  <div class="price-drops-panel">
+    <div class="settings-title">🔥 Recent Price Drops — possible sign the seller's open to negotiating</div>
+    <div class="price-drops-list">
+      {% for l in price_drops %}
+      <a class="price-drop-item" href="{{ l.url }}" target="_blank">
+        <span class="pd-title">{{ l.title or l.url }}</span>
+        <span class="pd-loc">{{ l.district or '' }}{{ ', ' if l.district and l.province }}{{ l.province or '' }}</span>
+        <span class="price-drop">↓ {{ l.price_change_pct|abs }}%</span>
+        <span class="pd-detail">{{ '{:,.0f}'.format(l.first_price) }} → {{ '{:,.0f}'.format(l.price) }} {{ l.currency }} · {{ l.last_price_change_at[:10] }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   <table>
     <thead>
