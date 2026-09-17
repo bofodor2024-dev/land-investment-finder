@@ -49,6 +49,7 @@ _SUFFIX_FLEXIBLE_ENDINGS = {
     "var": ("dır", "dir", "dur", "dür"),
     "mevcut": ("tur", "tır", "tir", "tür"),
     "tapu": ("lu", "lı", "li", "lü", "ludur", "lıdır", "lidir", "lüdür"),
+    "yok": ("tur", "tır", "tir", "tür"),
 }
 
 

@@ -249,7 +249,8 @@
           {% endif %}
         </td>
         <td class="breakdown">
-          value {{ l.breakdown.value }} · maturity {{ l.breakdown.maturity }} · irr {{ l.breakdown.irrigation }} · tapu {{ l.breakdown.tapu }} · access {{ l.breakdown.access }}
+          value {{ l.breakdown.value }}{% if l.value_comparison_note %}<span class="roi-hint" title="{{ l.value_comparison_note }}">*</span>{% endif %} · maturity {{ l.breakdown.maturity }} · irr {{ l.breakdown.irrigation }} · tapu {{ l.breakdown.tapu }} · access {{ l.breakdown.access }}
+          {% if l.value_comparison_note %}<br><small class="roi-hint">*{{ l.value_comparison_note }}</small>{% endif %}
         </td>
       </tr>
       {% else %}

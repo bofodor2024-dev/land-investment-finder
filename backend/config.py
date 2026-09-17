@@ -56,6 +56,10 @@ LIEN_KEYWORDS = ["ipotekli", "ipotek var", "haciz", "hacizli", "rehinli"]
 
 ROAD_ACCESS_KEYWORDS = [
     "yola cephe", "yol cepheli", "asfalt yol", "yola sıfır", "yolu var", "yol var", "yolu mevcut",
+    # "no transportation/road problem" is a common double-negative-as-positive
+    # phrasing ("ULAŞIM SORUNU YOKTUR") — a real listing used exactly this
+    # and the plain positive-phrasing keywords above all missed it entirely.
+    "ulaşım sorunu yok", "yol sorunu yok", "ulaşım sıkıntısı yok",
 ]
 ELECTRICITY_KEYWORDS = ["elektrik var", "elektrik mevcut"]
 
@@ -66,6 +70,18 @@ SCORE_WEIGHTS = {
     "tapu": 0.15,
     "access": 0.10,
 }
+
+# A real listing showed size_m2=55 in its own spec table (sahibinden's own
+# displayed "m² Fiyatı" was computed from that same 55, so it's the
+# seller/agency's own data-entry error — almost certainly meant "55 dönüm"
+# — not our extraction misreading the page). That implied ~605 million
+# TRY/dönüm, and since group averages are computed across listings, it was
+# corrupting the value score of every OTHER listing sharing its
+# (province, land_type) group, not just its own. This ceiling excludes
+# such outliers from group-average math entirely; well above the highest
+# legitimate price/dönüm seen so far (~700k) but far below an obvious
+# data-entry error.
+MAX_PLAUSIBLE_PRICE_PER_DONUM = 5_000_000
 
 # No title deed record or a lien/mortgage are legal dealbreakers, not just
 # "less attractive" factors — cap the composite score hard regardless of how

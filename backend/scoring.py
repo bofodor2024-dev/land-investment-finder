@@ -2,21 +2,51 @@ from __future__ import annotations
 
 from statistics import mean
 
-from config import SCORE_WEIGHTS, TAPU_HARD_CAP
+from config import MAX_PLAUSIBLE_PRICE_PER_DONUM, SCORE_WEIGHTS, TAPU_HARD_CAP
 from roi import estimate_olive_roi
 
 
-def _group_key(listing: dict) -> tuple:
-    return (listing.get("province"), listing.get("land_type"))
+# Three levels of comparison group, most specific first. A single-listing
+# group (itself, no real comparable) isn't useful for "how does this price
+# compare" — falling back to a broader level beats defaulting to a flat,
+# uninformative 50 just because nothing else matching (province, land_type)
+# has been captured yet (the exact gap that hid how cheap a genuinely good
+# deal was, since it was the only "Manisa raw_land" listing captured).
+_GROUP_LEVELS = [
+    ("type", lambda l: (l.get("province"), l.get("land_type"))),
+    ("province", lambda l: (l.get("province"),)),
+    ("overall", lambda l: ("all",)),
+]
 
 
 def compute_group_averages(listings: list[dict]) -> dict:
-    groups: dict[tuple, list[float]] = {}
+    """Returns {level_name: {key: [price_per_donum, ...]}} for all three
+    levels — not yet averaged, so score_listing can check each level's
+    sample size before trusting it."""
+    result = {name: {} for name, _ in _GROUP_LEVELS}
     for l in listings:
-        if l.get("size_donum") and l.get("price"):
-            price_per_donum = l["price"] / l["size_donum"]
-            groups.setdefault(_group_key(l), []).append(price_per_donum)
-    return {k: mean(v) for k, v in groups.items() if v}
+        if not l.get("size_donum") or not l.get("price"):
+            continue
+        price_per_donum = l["price"] / l["size_donum"]
+        # A single data-entry error (wrong size/price on the seller's own
+        # listing) shouldn't drag every OTHER listing sharing its group
+        # into a distorted comparison — see MAX_PLAUSIBLE_PRICE_PER_DONUM.
+        if price_per_donum > MAX_PLAUSIBLE_PRICE_PER_DONUM:
+            continue
+        for name, key_fn in _GROUP_LEVELS:
+            result[name].setdefault(key_fn(l), []).append(price_per_donum)
+    return result
+
+
+def _comparable_average(listing: dict, group_lists: dict) -> tuple[float | None, str | None]:
+    """First level with at least 2 entries (itself + one real comparable —
+    a group of 1 is just the listing being scored, comparing against itself
+    would trivially land at the neutral midpoint every time)."""
+    for level, key_fn in _GROUP_LEVELS:
+        bucket = group_lists.get(level, {}).get(key_fn(listing))
+        if bucket and len(bucket) >= 2:
+            return mean(bucket), level
+    return None, None
 
 
 def score_listing(listing: dict, group_averages: dict, settings: dict) -> dict:
@@ -26,13 +56,27 @@ def score_listing(listing: dict, group_averages: dict, settings: dict) -> dict:
     # --- value: price/donum vs comparable group average (lower is better) ---
     value_score = 50.0
     price_per_donum = None
+    value_comparison_note = None
     if listing.get("size_donum") and listing.get("price"):
         price_per_donum = listing["price"] / listing["size_donum"]
-        avg = group_averages.get(_group_key(listing))
-        if avg:
-            ratio = price_per_donum / avg
-            # 30% below average -> ~100, at average -> 50, 50% above -> ~0
-            value_score = max(0.0, min(100.0, 50 + (1 - ratio) * 150))
+        if price_per_donum > MAX_PLAUSIBLE_PRICE_PER_DONUM:
+            red_flags.append(
+                f"Price/dönüm ({price_per_donum:,.0f} TRY) is implausibly high — "
+                "likely a size or price data-entry error on the listing itself. "
+                "Verify size/price directly before trusting this listing's numbers."
+            )
+        else:
+            avg, comparison_level = _comparable_average(listing, group_averages)
+            if avg:
+                ratio = price_per_donum / avg
+                # 30% below average -> ~100, at average -> 50, 50% above -> ~0
+                value_score = max(0.0, min(100.0, 50 + (1 - ratio) * 150))
+                if comparison_level != "type":
+                    value_comparison_note = (
+                        "vs. all captured land in " + str(listing.get("province"))
+                        if comparison_level == "province"
+                        else "vs. all captured listings (no comparable in its own province/type yet)"
+                    )
     breakdown["value"] = round(value_score, 1)
 
     # --- maturity: existing productive orchard scores higher than raw land ---
@@ -102,6 +146,7 @@ def score_listing(listing: dict, group_averages: dict, settings: dict) -> dict:
         "breakdown": breakdown,
         "red_flags": red_flags,
         "price_per_donum": round(price_per_donum, 1) if price_per_donum is not None else None,
+        "value_comparison_note": value_comparison_note,
         "roi": estimate_olive_roi(listing, settings),
     }
 
