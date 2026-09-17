@@ -41,6 +41,9 @@
   #recompute-btn { margin-left: auto; padding: 0.35rem 0.7rem; border: 1px solid #2f2a20; border-radius: 4px; background: #2f2a20; color: #fff; font-size: 0.8rem; cursor: pointer; }
   #recompute-btn:hover { background: #423b2c; }
   #recompute-btn:disabled { opacity: 0.5; cursor: default; }
+  #restart-btn { padding: 0.35rem 0.7rem; border: 1px solid #8a6d1c; border-radius: 4px; background: #fff; color: #8a6d1c; font-size: 0.8rem; cursor: pointer; }
+  #restart-btn:hover { background: #fdf6e3; }
+  #restart-btn:disabled { opacity: 0.5; cursor: default; }
   .recompute-status { font-size: 0.78rem; color: #666; }
   .settings-panel { margin-bottom: 1.2rem; background: white; border: 1px solid #e5e0d5; border-radius: 6px; padding: 0.5rem 0.9rem; }
   .settings-title { font-size: 0.85rem; font-weight: 600; padding: 0.3rem 0; }
@@ -88,6 +91,8 @@
     {% endif %}
     <button type="button" id="recompute-btn" onclick="recomputeAll()" title="Re-runs scoring/extraction on every captured listing using its saved raw data — no need to re-visit sahibinden.">Recompute All</button>
     <span id="recompute-status" class="recompute-status"></span>
+    <button type="button" id="restart-btn" onclick="restartServer()" title="Restarts the server process. Only works because it auto-restarts via a LaunchAgent — if that's ever removed, this button stops the server with no way to bring it back from here.">Restart Server</button>
+    <span id="restart-status" class="recompute-status"></span>
   </form>
 
   <div class="settings-panel">
@@ -222,6 +227,38 @@
         status.textContent = 'Failed: ' + err.message;
         btn.disabled = false;
       }
+    }
+
+    async function restartServer() {
+      const btn = document.getElementById('restart-btn');
+      const status = document.getElementById('restart-status');
+      btn.disabled = true;
+      status.textContent = 'Restarting...';
+      try {
+        await fetch('/api/restart', { method: 'POST' });
+      } catch (err) {
+        // Expected — the process exits shortly after responding, so this
+        // request itself may fail to complete cleanly. Proceed to polling.
+      }
+
+      // The process is briefly down until the LaunchAgent (KeepAlive)
+      // relaunches it — poll until it answers again, then reload.
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        try {
+          const res = await fetch('/', { method: 'HEAD' });
+          if (res.ok) {
+            status.textContent = 'Back up — reloading...';
+            setTimeout(() => location.reload(), 300);
+            return;
+          }
+        } catch (err) {
+          status.textContent = `Restarting... (${attempt + 1}/${maxAttempts})`;
+        }
+      }
+      status.textContent = 'Still down after 20s — check the LaunchAgent (see launchctl list).';
+      btn.disabled = false;
     }
 
     async function saveSettings() {

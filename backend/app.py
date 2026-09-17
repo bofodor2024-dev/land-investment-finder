@@ -1,4 +1,8 @@
 import json
+import os
+import signal
+import threading
+import time
 
 from flask import Flask, jsonify, render_template, request
 
@@ -86,6 +90,21 @@ def settings():
 def archive_listing(listing_id):
     db.set_status(listing_id, "archived")
     return jsonify({"ok": True})
+
+
+@app.route("/api/restart", methods=["POST"])
+def restart():
+    """Exits this process shortly after responding. Only meaningful because
+    the LaunchAgent (com.landinvestmentfinder.server, KeepAlive=true) brings
+    it right back up — without that, this would just stop the server with
+    no way to start it again from the page itself."""
+
+    def do_exit():
+        time.sleep(0.5)  # let the HTTP response flush before the process dies
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    threading.Thread(target=do_exit).start()
+    return jsonify({"restarting": True})
 
 
 @app.route("/api/listings/<int:listing_id>/tree_override", methods=["POST"])
