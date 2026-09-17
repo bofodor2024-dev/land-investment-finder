@@ -86,6 +86,8 @@ def init_db():
             conn.execute("ALTER TABLE listings ADD COLUMN tree_count_override INTEGER")
         if "tree_age_years_override" not in existing_cols:
             conn.execute("ALTER TABLE listings ADD COLUMN tree_age_years_override INTEGER")
+        if "size_note" not in existing_cols:
+            conn.execute("ALTER TABLE listings ADD COLUMN size_note TEXT")
 
 
 def upsert_listing(fields: dict, track_price_history: bool = True) -> tuple[int, bool, bool]:

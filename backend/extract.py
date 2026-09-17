@@ -181,6 +181,21 @@ def _parse_size_m2(specs: dict, text: str) -> float | None:
     return None
 
 
+def _extract_title_size_donum(title: str) -> float | None:
+    """Sellers state a dönüm figure directly in the title far more often
+    than they get it wrong there — a real listing's spec table showed
+    "m²: 579.568" while its own title and parcel-by-parcel description
+    both said "457 DÖNÜM" (≈456,990 m²). The title is the number a seller
+    is most careful about; the detail fields are where mistakes creep in."""
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:dönüm|dönum|donum|dön|don)\b", _turkish_lower(title or ""))
+    if not m:
+        return None
+    try:
+        return float(m.group(1).replace(",", "."))
+    except ValueError:
+        return None
+
+
 # The seller's free-text description sits between an "Açıklama" heading and
 # an "Özellikler" (Features) heading in sahibinden's page text. The
 # extension's guessed CSS selector for this kept grabbing the wrong element
@@ -256,6 +271,25 @@ def normalize(payload: dict) -> dict:
     size_m2 = _parse_size_m2(specs, full_text)
     size_donum = round(size_m2 / 1000, 3) if size_m2 else None
 
+    # Prefer the title's stated size over the spec table's when they
+    # meaningfully disagree — a real listing's title and parcel-by-parcel
+    # description both said "457 DÖNÜM" while its spec table showed
+    # "m²: 579.568" (implying ~579.6 dönüm). Sellers are more careful with
+    # the headline number; mistakes creep into the detail fields instead.
+    size_note = None
+    title_donum = _extract_title_size_donum(payload.get("title", ""))
+    if title_donum and size_donum and abs(title_donum - size_donum) / size_donum > 0.05:
+        size_note = (
+            f"Title states {title_donum:g} dönüm but the spec table implied "
+            f"{size_donum:g} dönüm — using the title's figure as more reliable. "
+            "Verify directly with the agency."
+        )
+        size_donum = title_donum
+        size_m2 = title_donum * 1000
+    elif title_donum and not size_donum:
+        size_donum = title_donum
+        size_m2 = title_donum * 1000
+
     tree_count = _extract_tree_count(specs, full_text)
     tree_age = _extract_tree_age(specs, full_text)
     tree_species = _extract_tree_species(full_text)
@@ -305,6 +339,7 @@ def normalize(payload: dict) -> dict:
         "currency": payload.get("currency", "TRY"),
         "size_m2": size_m2,
         "size_donum": size_donum,
+        "size_note": size_note,
         "province": province,
         "district": district,
         "neighborhood": neighborhood,

@@ -206,7 +206,10 @@
             {% endif %}
           {% else %}—{% endif %}
         </td>
-        <td>{{ l.size_donum ~ ' dönüm' if l.size_donum else (l.size_m2 ~ ' m²' if l.size_m2 else '—') }}</td>
+        <td>
+          {{ l.size_donum ~ ' dönüm' if l.size_donum else (l.size_m2 ~ ' m²' if l.size_m2 else '—') }}
+          {% if l.size_note %}<br><span class="roi-hint" title="{{ l.size_note }}">⚠ size mismatch</span>{% endif %}
+        </td>
         <td>
           <span class="tag {{ 'orchard' if l.land_type == 'existing_orchard' else 'raw' }}">{{ l.land_type or 'unknown' }}</span>
           {% if l.tree_species %}<br><small>{{ l.tree_species }}{% if l.tree_count %} ({{ l.tree_count }} trees{% if l.tree_age_years %}, ~{{ l.tree_age_years }}y{% endif %}){% endif %}{% if l.tree_count_override is not none or l.tree_age_years_override is not none %} <span class="manual-tag">manual</span>{% endif %}</small>{% endif %}
