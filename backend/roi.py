@@ -39,10 +39,22 @@ DEFAULT_SETTINGS), editable from the dashboard, not hardcoded here:
 The yield-by-age curve itself (config.OLIVE_YIELD_BY_AGE_KG) stays in
 config.py since it's a more complex structure less suited to a simple
 settings input.
+
+Yield is also adjusted by a rainfall multiplier (config.
+PROVINCE_ANNUAL_RAINFALL_MM, sourced from Turkey's official MGM climate
+statistics) for non-irrigated land only — see _rainfall_yield_multiplier.
+Irrigated groves are forced to 1.0 regardless of province, since they
+aren't rainfall-limited.
 """
 from __future__ import annotations
 
-from config import MATURE_TREE_LANGUAGE, OLIVE_YIELD_BY_AGE_KG
+from config import (
+    MATURE_TREE_LANGUAGE,
+    OLIVE_YIELD_BY_AGE_KG,
+    PROVINCE_ANNUAL_RAINFALL_MM,
+    RAINFALL_REFERENCE_MM,
+    RAINFALL_YIELD_FLOOR,
+)
 from extract import _turkish_lower
 
 MAX_PROJECTION_YEARS = 40
@@ -61,8 +73,23 @@ def _yield_per_tree_kg(age_years: float) -> float:
     return points[-1][1]
 
 
+def _rainfall_yield_multiplier(listing: dict) -> float:
+    """1.0 whenever irrigation is present (var/kuyu/artezyen) — irrigated
+    groves aren't rainfall-limited, so this only matters for "yok"/
+    "unknown". 1.0 also when we have no rainfall data for the province
+    (don't penalize blindly). See config.PROVINCE_ANNUAL_RAINFALL_MM."""
+    irrigation = (listing.get("irrigation") or "").lower()
+    if irrigation in ("var", "kuyu", "artezyen"):
+        return 1.0
+    rainfall = PROVINCE_ANNUAL_RAINFALL_MM.get(_turkish_lower(listing.get("province") or ""))
+    if rainfall is None:
+        return 1.0
+    ratio = rainfall / RAINFALL_REFERENCE_MM
+    return max(RAINFALL_YIELD_FLOOR, min(1.0, ratio))
+
+
 def _project_payback_years(
-    tree_count: float, starting_age: float, total_investment: float, price_per_kg: float
+    tree_count: float, starting_age: float, total_investment: float, price_per_kg: float, rainfall_mult: float = 1.0
 ) -> float | None:
     """Simulates yearly production ramping up per the age->yield curve,
     starting from `starting_age`, until cumulative revenue covers
@@ -71,7 +98,7 @@ def _project_payback_years(
     MAX_PROJECTION_YEARS."""
     cumulative = 0.0
     for year in range(MAX_PROJECTION_YEARS):
-        annual_revenue = tree_count * _yield_per_tree_kg(starting_age + year) * price_per_kg
+        annual_revenue = tree_count * _yield_per_tree_kg(starting_age + year) * rainfall_mult * price_per_kg
         cumulative += annual_revenue
         if cumulative >= total_investment:
             prev_cumulative = cumulative - annual_revenue
@@ -162,15 +189,17 @@ def estimate_olive_roi(listing: dict, settings: dict) -> dict | None:
     else:
         return None
 
+    rainfall_mult = _rainfall_yield_multiplier(listing)
     total_investment = price + extra_upfront_cost
-    payback_years = _project_payback_years(tree_count, starting_age, total_investment, price_per_kg)
-    year1_production_kg = round(tree_count * _yield_per_tree_kg(starting_age))
+    payback_years = _project_payback_years(tree_count, starting_age, total_investment, price_per_kg, rainfall_mult)
+    year1_production_kg = round(tree_count * _yield_per_tree_kg(starting_age) * rainfall_mult)
 
     return {
         "scenario": scenario,
         "tree_count_used": tree_count,
         "tree_count_estimated": tree_count_estimated,
         "starting_age_used": starting_age,
+        "rainfall_yield_multiplier": round(rainfall_mult, 2),
         "tree_age_estimated": tree_age_estimated,
         "extra_upfront_cost_try": round(extra_upfront_cost) if extra_upfront_cost else 0,
         "total_investment_try": round(total_investment),

@@ -255,6 +255,9 @@
             {% else %}
               <span class="roi-hint">&gt;{{ 40 }}y (doesn't pay back)</span>
             {% endif %}
+            {% if l.roi.rainfall_yield_multiplier is not none and l.roi.rainfall_yield_multiplier < 0.95 %}
+              <br><small class="roi-hint">yield ×{{ l.roi.rainfall_yield_multiplier }} (below-reference rainfall, non-irrigated)</small>
+            {% endif %}
           {% endif %}
         </td>
         <td class="breakdown">

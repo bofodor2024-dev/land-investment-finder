@@ -109,6 +109,25 @@ OLIVE_YIELD_BY_AGE_KG = [
     (30, 55),    # plateau
 ]
 
+# Long-term annual average precipitation (mm), official Turkish State
+# Meteorological Service (MGM) climate statistics — keys are Turkish-
+# lowercased province names (matched via extract._turkish_lower). Only
+# used to adjust yield for NON-irrigated land (irrigation "yok"/
+# "unknown") — irrigated groves aren't rainfall-limited, so this has no
+# effect when irrigation is present. All four provinces captured so far
+# are well-watered by Mediterranean olive standards (~590-710mm, all
+# above the ~600mm reference below), so the effect is small for current
+# listings — it'll matter more for anything captured in a drier area.
+# Add more provinces here as you capture listings elsewhere.
+PROVINCE_ANNUAL_RAINFALL_MM = {
+    "izmir": 707.4,      # mgm.gov.tr/veridegerlendirme (1938-2025 record)
+    "manisa": 706.4,     # izmir.mgm.gov.tr/files/iklim/manisa_iklim.pdf
+    "aydın": 618.4,      # izmir.mgm.gov.tr/FILES/iklim/aydin_iklim.pdf
+    "çanakkale": 591.5,  # izmir.mgm.gov.tr/FILES/iklim/canakkale_iklim.pdf
+}
+RAINFALL_REFERENCE_MM = 600  # commonly-cited "sufficient" rain-fed olive baseline
+RAINFALL_YIELD_FLOOR = 0.6   # never penalize below 60% for rainfall alone
+
 # Wholesale olive price, planting density (trees/dönüm), and planting cost
 # (TL/tree) now live in the `settings` table (db.py DEFAULT_SETTINGS), not
 # here — editable from the dashboard settings panel so you can plug in
